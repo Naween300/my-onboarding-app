@@ -534,6 +534,21 @@ export const Step3BrandSetup = ({ data, onSubmit, onBack, isCompleting = false }
         >
           🧪 Test Form Submission
         </button>
+        
+        {/* Manual Override Button */}
+        <button
+          type="button"
+          onClick={() => {
+            console.log('🔄 Manual completion triggered');
+            localStorage.setItem('onboardingCompleted', 'true');
+            localStorage.setItem('completionTimestamp', Date.now().toString());
+            localStorage.setItem('manualCompletion', 'true');
+            window.location.href = `/dashboard?manual=true&t=${Date.now()}`;
+          }}
+          className="px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors"
+        >
+          🚨 Complete Manually (if stuck)
+        </button>
       </div>
     </form>
   );

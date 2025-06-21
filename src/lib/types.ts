@@ -30,6 +30,9 @@ export interface OnboardingData {
   timeline: 'quick' | 'steady' | 'long-term';
 }
 
+// Add this alias for compatibility
+export type FormData = OnboardingData;
+
 export interface BusinessType {
   id: string;
   name: string;
