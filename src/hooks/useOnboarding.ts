@@ -1,4 +1,6 @@
 import { useState, useCallback } from 'react'
+import { createClient } from '@supabase/supabase-js';
+import { useAuth, useUser } from '@clerk/nextjs';
 import { OnboardingData } from '@/lib/types'
 import { DatabaseService } from '@/lib/database'
 import { StorageService } from '@/lib/storage'
@@ -11,7 +13,7 @@ interface UseOnboardingReturn {
   updateData: (newData: Partial<OnboardingData>) => void
   saveStepData: (stepData: Partial<OnboardingData>) => Promise<boolean>
   saveCompleteData: () => Promise<boolean>
-  loadFromDatabase: (id: string) => Promise<void>
+  loadFromDatabase: () => Promise<void>
   resetData: () => void
 }
 
@@ -40,19 +42,46 @@ const initialData: Partial<OnboardingData> = {
   timeline: 'steady'
 }
 
-export const useOnboarding = (): UseOnboardingReturn => {
+export const useOnboarding = (): UseOnboardingReturn & { testAuth: () => Promise<boolean> } => {
   const [data, setData] = useState<Partial<OnboardingData>>(initialData)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [currentId, setCurrentId] = useState<string | null>(null)
+  const { getToken } = useAuth();
+  const { user } = useUser();
+
+  // Create Supabase client directly in the hook
+  const createSupabaseClient = () => {
+    return createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        global: {
+          fetch: async (url, options = {}) => {
+            const clerkToken = await getToken({ template: 'supabase' });
+            const headers = new Headers(options?.headers);
+            if (clerkToken) {
+              headers.set('Authorization', `Bearer ${clerkToken}`);
+            }
+            return fetch(url, { ...options, headers });
+          },
+        },
+      }
+    );
+  };
 
   const updateData = useCallback((newData: Partial<OnboardingData>) => {
-    console.log('🔄 updateData called with:', newData)
+    console.log('🔄 updateData called with:', newData);
+    
     setData(prevData => {
-      const updatedData = { ...prevData, ...newData }
-      console.log('📊 Updated data state:', updatedData)
-      return updatedData
-    })
+      const updatedData = {
+        ...prevData,
+        ...newData
+      };
+      
+      console.log('✅ Data state updated to:', updatedData);
+      return updatedData;
+    });
   }, [])
 
   // ✅ ENHANCED: Better validation and error handling
@@ -147,113 +176,140 @@ export const useOnboarding = (): UseOnboardingReturn => {
 
   // ✅ ENHANCED: Better validation for complete data save
   const saveCompleteData = useCallback(async (): Promise<boolean> => {
-    console.log('🏁 saveCompleteData called with:', data)
-    setIsLoading(true)
-    setError(null)
+    console.log('💾 saveCompleteData called with current data:', data);
+    setIsLoading(true);
+    setError(null);
 
     try {
-      // ✅ CRITICAL: Validate required fields before saving
-      if (!data.businessType || !data.businessName) {
-        const missingFields = [];
-        if (!data.businessType) missingFields.push('businessType');
-        if (!data.businessName) missingFields.push('businessName');
-        
+      // ✅ Validate required fields
+      const requiredFields = ['businessType', 'businessName', 'goals', 'brandPersonality'];
+      const missingFields = requiredFields.filter(field => {
+        const value = (data as any)[field];
+        return !value || (Array.isArray(value) && value.length === 0);
+      });
+      
+      if (missingFields.length > 0) {
         const errorMsg = `Cannot save: Missing required fields: ${missingFields.join(', ')}`;
         console.error('❌ Final validation failed:', errorMsg);
-        console.error('❌ Current data:', data);
+        console.error('❌ Current data state:', data);
         setError(errorMsg);
         return false;
       }
 
-      let logoFileName: string | undefined
-
-      // Handle logo upload if present
-      if (data.logo && data.businessName) {
-        console.log('📁 Uploading logo for final save...')
-        
-        const { fileName, publicUrl, error: uploadError } = await StorageService.uploadLogo(
-          data.logo, 
-          data.businessName
-        )
-        
-        if (uploadError) {
-          console.error('❌ Logo upload failed:', uploadError)
-          setError('Failed to upload logo')
-          return false
-        }
-        
-        logoFileName = fileName || undefined
-        console.log('✅ Logo uploaded for final save:', { fileName, publicUrl })
+      if (!user) {
+        setError('User not authenticated');
+        return false;
       }
 
-      // ✅ ENHANCED: Save complete data to database with better logging
-      console.log('💾 Calling DatabaseService for final save...')
-      let result
-      if (currentId) {
-        console.log('🔄 Updating existing record with ID:', currentId)
-        result = await DatabaseService.updateOnboardingData(currentId, data, logoFileName)
-      } else {
-        console.log('🆕 Creating new record')
-        result = await DatabaseService.saveOnboardingData(data, logoFileName)
+      // ✅ Create Supabase client
+      const supabase = createSupabaseClient();
+
+      // ✅ Save to user_profiles first
+      const { data: userResult, error: userError } = await supabase
+        .from('user_profiles')
+        .upsert({
+          clerk_user_id: user.id,
+          email: user.primaryEmailAddress?.emailAddress,
+          name: user.fullName || data.businessName,
+          avatar_url: user.imageUrl,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'clerk_user_id' });
+
+      if (userError) {
+        console.error('❌ User profile error:', userError);
+        setError(`User profile error: ${userError.message}`);
+        return false;
       }
+
+      // ✅ Save to onboarding table
+      const { data: onboardingResult, error: onboardingError } = await supabase
+        .from('onboarding')
+        .upsert({
+          clerk_user_id: user.id,
+          business_name: data.businessName,
+          business_type: data.businessType,
+          location_type: data.locationType || 'online',
+          location: data.location,
+          customer_type: data.customerType,
+          goals: data.goals,
+          brand_personality: data.brandPersonality,
+          social_media_presence: data.socialMediaPresence,
+          brand_colors: data.brandColors,
+          contact_info: data.contactInfo,
+          budget: data.budget,
+          timeline: data.timeline,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'clerk_user_id' });
+
+      if (onboardingError) {
+        console.error('❌ Onboarding error:', onboardingError);
+        setError(`Onboarding error: ${onboardingError.message}`);
+        return false;
+      }
+
+      console.log('✅ Database save completed successfully');
+      return true;
       
-      if (result.error) {
-        console.error('❌ Database save error:', result.error)
-        console.error('❌ Error details:', {
-          message: result.error.message,
-          code: result.error.code,
-          details: result.error.details,
-          hint: result.error.hint
-        });
-        setError(`Failed to save onboarding data: ${result.error.message || JSON.stringify(result.error)}`)
-        return false
-      }
-
-      // Store the ID for future reference
-      if (result.data?.id) {
-        setCurrentId(result.data.id)
-        localStorage.setItem('onboardingId', result.data.id)
-        console.log('🆕 Final record ID stored:', result.data.id)
-      }
-
-      console.log('✅ Complete data saved successfully to database')
-      return true
-      
-    } catch (err) {
-      console.error('❌ Unexpected error in saveCompleteData:', err)
-      setError(`Complete save error: ${err instanceof Error ? err.message : 'Unknown error'}`)
-      return false
+    } catch (error) {
+      console.error('❌ Database save error:', error);
+      setError(`Database error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return false;
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }, [data, currentId])
+  }, [data, user, getToken]);
 
-  const loadFromDatabase = useCallback(async (id: string): Promise<void> => {
-    console.log('📥 loadFromDatabase called with ID:', id)
-    setIsLoading(true)
-    setError(null)
-
+  const loadFromDatabase = useCallback(async () => {
+    if (!user?.id) return;
+    setIsLoading(true);
+    setError(null);
+    const supabase = createSupabaseClient();
     try {
-      const { data: loadedData, error: loadError } = await DatabaseService.getOnboardingData(id)
-      
+      const { data: loadedData, error: loadError } = await supabase
+        .from('user_profiles')
+        .select('*')
+        .eq('clerk_user_id', user.id)
+        .single();
       if (loadError) {
-        console.error('❌ Load error:', loadError)
-        setError('Failed to load onboarding data')
-        return
+        console.error('Database error:', loadError);
+        setError('Failed to load onboarding data');
+        return;
       }
-
       if (loadedData) {
-        setData(loadedData)
-        setCurrentId(id)
-        console.log('✅ Data loaded from database:', loadedData)
+        setData(loadedData);
+        setCurrentId(loadedData.id);
+        console.log('✅ Data loaded from database:', loadedData);
       }
     } catch (err) {
-      console.error('❌ Unexpected load error:', err)
-      setError('An unexpected error occurred while loading data')
+      console.error('Error loading from database:', err);
+      setError('An unexpected error occurred while loading data');
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }, [])
+  }, [user, getToken]);
+
+  // Test authentication before fetching data
+  const testAuth = useCallback(async () => {
+    try {
+      const supabase = createSupabaseClient();
+      const { data: testData, error: testError } = await supabase.rpc('test_authorization_header');
+      
+      console.log('🔍 Auth test results:', {
+        role: testData?.role,
+        userId: testData?.sub,
+        error: testError
+      });
+      
+      if (testData?.role !== 'authenticated') {
+        console.error('❌ User not authenticated:', testData?.role);
+        return false;
+      }
+      return true;
+    } catch (error) {
+      console.error('❌ Error testing authentication:', error);
+      return false;
+    }
+  }, [getToken]);
 
   const resetData = useCallback(() => {
     console.log('🔄 resetData called')
@@ -272,6 +328,7 @@ export const useOnboarding = (): UseOnboardingReturn => {
     saveStepData,
     saveCompleteData,
     loadFromDatabase,
-    resetData
+    resetData,
+    testAuth
   }
 }

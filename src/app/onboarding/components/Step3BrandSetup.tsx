@@ -109,32 +109,41 @@ export const Step3BrandSetup = ({ data, onSubmit, onBack, isCompleting = false }
   };
 
   const handleFormSubmit = async (formData: any) => {
-    console.log('🔥 [Step3] ORIGINAL Complete Setup button clicked!');
-    console.log('🔥 [Step3] Form data received:', formData);
-    console.log('🔥 [Step3] Component data available:', data);
-    // ✅ Since debug shows all data is present, use it directly
-    const completeData = {
-      // Step 1 data (confirmed present in debug)
-      businessType: data.businessType,     // "healthcare"
-      businessName: data.businessName,     // "test1"
-      locationType: data.locationType,     // "online"
-      location: data.location,
-      customerType: data.customerType,     // "b2c"
-      // Step 2 data (confirmed present in debug)
-      goals: data.goals,                   // Array(3)
-      brandPersonality: data.brandPersonality,  // Array(3)
-      socialMediaPresence: data.socialMediaPresence,
-      // Step 3 data (current form)
-      ...(logo ? { logo } : {}),
-      brandColors: colors,
-      contactInfo: formData.contactInfo,
-      budget,
-      timeline: formData.timeline,
-    };
-    console.log('✅ [Step3] Complete data prepared for submission:', completeData);
-    console.log('🚀 [Step3] Calling onSubmit with complete data...');
-    // Call onSubmit with complete data (same as test button)
-    await onSubmit(completeData);
+    if (isStepCompleting) return;
+    
+    setIsStepCompleting(true);
+    console.log('🔥 [Step3] Complete Setup button clicked!');
+    
+    try {
+      // ✅ Prepare complete data from all steps
+      const completeData = {
+        // Step 1 data
+        businessType: data.businessType,
+        businessName: data.businessName,
+        locationType: data.locationType,
+        location: data.location,
+        customerType: data.customerType,
+        // Step 2 data
+        goals: data.goals,
+        brandPersonality: data.brandPersonality,
+        socialMediaPresence: data.socialMediaPresence,
+        // Step 3 data
+        brandColors: colors,
+        contactInfo: formData.contactInfo,
+        budget,
+        timeline: formData.timeline,
+        ...(logo ? { logo } : {})
+      };
+      
+      console.log('✅ [Step3] Complete data prepared:', completeData);
+      
+      // ✅ Call onSubmit which should trigger the completion handler
+      await onSubmit(completeData);
+    } catch (error) {
+      console.error('❌ [Step3] Error in form submission:', error);
+    } finally {
+      setIsStepCompleting(false);
+    }
   };
 
   return (
@@ -493,61 +502,34 @@ export const Step3BrandSetup = ({ data, onSubmit, onBack, isCompleting = false }
         >
           Back
         </button>
+        
+        {/* Update your Complete Setup button */}
         <button
           type="button"
           onClick={async (e) => {
             e.preventDefault();
-            console.log('🖱️ [Step3] Direct button click - bypassing form submission');
-            // Get form data manually using watch()
+            e.stopPropagation();
+            
+            // Get current form data
             const currentFormData = {
               contactInfo: watch('contactInfo'),
               timeline: watch('timeline')
             };
-            console.log('📝 [Step3] Manual form data:', currentFormData);
-            // Call your form handler directly
+            
+            console.log('🖱️ [Step3] Complete Setup clicked');
             await handleFormSubmit(currentFormData);
           }}
           disabled={isStepCompleting}
-          className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 text-white py-4 px-6 rounded-lg font-semibold hover:from-green-700 hover:to-emerald-700 transition-all transform hover:scale-105"
         >
-          Complete Setup
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            const testData = {
-              businessType: 'tech',
-              businessName: 'Form Test Company',
-              locationType: 'online' as const,
-              customerType: 'b2c' as const,
-              goals: ['brand-awareness'],
-              brandPersonality: ['professional'],
-              socialMediaPresence: { facebook: 'none' as const, instagram: 'none' as const, linkedin: 'none' as const },
-              brandColors: { primary: '#3B82F6', secondary: '#EF4444' },
-              budget: 500,
-              timeline: 'steady' as const
-            };
-            console.log('🧪 [FormTest] Calling onSubmit directly with test data');
-            onSubmit(testData);
-          }}
-          className="px-4 py-2 bg-green-500 text-white rounded"
-        >
-          🧪 Test Form Submission
-        </button>
-        
-        {/* Manual Override Button */}
-        <button
-          type="button"
-          onClick={() => {
-            console.log('🔄 Manual completion triggered');
-            localStorage.setItem('onboardingCompleted', 'true');
-            localStorage.setItem('completionTimestamp', Date.now().toString());
-            localStorage.setItem('manualCompletion', 'true');
-            window.location.href = `/dashboard?manual=true&t=${Date.now()}`;
-          }}
-          className="px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors"
-        >
-          🚨 Complete Manually (if stuck)
+          {isStepCompleting ? (
+            <div className="flex items-center justify-center">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+              Completing Setup...
+            </div>
+          ) : (
+            '🚀 Complete Setup & Launch!'
+          )}
         </button>
       </div>
     </form>

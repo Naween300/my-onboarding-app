@@ -1,6 +1,31 @@
 // src/lib/database.ts
 import { supabase, OnboardingRecord } from './supabase'
 import { OnboardingData } from './types'
+import { createClient } from '@supabase/supabase-js'
+import { useAuth } from '@clerk/nextjs'
+
+// ✅ Create authenticated Supabase client function
+export function createAuthenticatedSupabaseClient(getToken: any) {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      global: {
+        fetch: async (url, options = {}) => {
+          // ✅ Get Clerk JWT token for authentication
+          const clerkToken = await getToken({ template: 'supabase' })
+          
+          const headers = new Headers(options?.headers)
+          if (clerkToken) {
+            headers.set('Authorization', `Bearer ${clerkToken}`)
+          }
+          
+          return fetch(url, { ...options, headers })
+        },
+      },
+    }
+  )
+}
 
 export class DatabaseService {
   // ✅ FIXED: Convert OnboardingData to database format with proper validation
@@ -192,27 +217,42 @@ export class DatabaseService {
     }
   }
 
-  static async getOnboardingData(id: string): Promise<{ data: Partial<OnboardingData> | null, error: any }> {
+  static async getOnboardingData(clerkUserId: string, getToken: any) {
     try {
-      console.log('📥 Loading onboarding data for ID:', id)
+      // ✅ Use authenticated client instead of default
+      const supabase = createAuthenticatedSupabaseClient(getToken);
       
-      const { data, error } = await supabase
-        .from('onboarding')
-        .select('*')
-        .eq('id', id)
-        .single()
+      console.log('📥 Fetching onboarding data for:', clerkUserId);
+      
+      const { data: profile, error } = await supabase
+        .from('user_profiles')
+        .select(`
+          *,
+          onboarding (
+            business_name,
+            business_type,
+            budget,
+            timeline,
+            brand_colors,
+            goals,
+            brand_personality
+          )
+        `)
+        .eq('clerk_user_id', clerkUserId)
+        .single();
 
       if (error) {
-        console.error('❌ Error fetching onboarding data:', error)
-        return { data: null, error }
+        // ✅ Enhanced error handling for empty objects
+        if (Object.keys(error).length === 0 || !error.message) {
+          throw new Error('RLS Policy Violation: Access denied. User may not be properly authenticated or policies are blocking access.');
+        }
+        throw new Error(error.message);
       }
 
-      const formData = this.transformFromDbFormat(data)
-      console.log('✅ Successfully loaded onboarding data:', formData)
-      return { data: formData, error: null }
-    } catch (err) {
-      console.error('❌ Unexpected error in getOnboardingData:', err)
-      return { data: null, error: err }
+      return { data: profile, error: null };
+    } catch (error: any) {
+      console.error('❌ Error fetching onboarding data:', error.message || error);
+      return { data: null, error };
     }
   }
 

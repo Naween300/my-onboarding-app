@@ -1,79 +1,85 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server'
-import { NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 
 const isPublicRoute = createRouteMatcher([
-  '/sign-in(.*)',
+  '/sign-in(.*)', 
   '/sign-up(.*)',
   '/',
-  '/api/webhooks(.*)'
+  '/api(.*)'
 ])
 
 const isOnboardingRoute = createRouteMatcher(['/onboarding(.*)'])
 
-export default clerkMiddleware(async (auth, req) => {
-  const { userId, sessionClaims } = await auth()
-
-  // Allow public routes
-  if (isPublicRoute(req)) {
-    return NextResponse.next()
-  }
-
-  // Redirect unauthenticated users to sign-in
-  if (!userId) {
-    console.log('🔄 Redirecting to sign-in - no user ID');
-    return NextResponse.redirect(new URL('/sign-in', req.url))
-  }
-
-  // ✅ Temporary fix - allow dashboard access for testing (uncomment if needed)
-  // if (req.nextUrl.pathname === '/dashboard' && userId) {
-  //   console.log('✅ Allowing dashboard access for testing');
-  //   return NextResponse.next()
-  // }
-
-  // ✅ Check multiple sources for onboarding completion
-  const metadata = sessionClaims?.metadata as { onboardingComplete?: boolean } | undefined;
-  const unsafeMetadata = sessionClaims?.unsafeMetadata as { onboardingComplete?: boolean } | undefined;
+export default clerkMiddleware(async (auth, request) => {
+  const { userId } = await auth()
+  const url = new URL(request.url)
   
-  const hasCompletedOnboarding = 
-    metadata?.onboardingComplete || 
-    unsafeMetadata?.onboardingComplete ||
-    req.nextUrl.searchParams.get('completed') || // Check URL parameter
-    req.nextUrl.searchParams.get('manual'); // Check manual completion parameter
-
-  console.log('🔍 Middleware check:', {
-    path: req.nextUrl.pathname,
-    userId: userId ? 'Present' : 'Missing',
-    onboardingComplete: hasCompletedOnboarding,
-    urlCompleted: req.nextUrl.searchParams.get('completed'),
-    manualCompletion: req.nextUrl.searchParams.get('manual'),
-    sessionClaims: metadata || unsafeMetadata
-  });
-
-  // ✅ Special handling for dashboard with completion parameter
-  if (req.nextUrl.pathname === '/dashboard' && (req.nextUrl.searchParams.get('completed') || req.nextUrl.searchParams.get('manual'))) {
-    console.log('✅ Allowing dashboard access with completion parameter');
-    return NextResponse.next()
+  // ✅ Bypass for immediate post-completion redirect
+  if (url.searchParams.get('onboarding') === 'completed' && userId) {
+    console.log('🔄 Bypassing middleware check for completed onboarding');
+    return;
+  }
+  
+  // Allow public routes
+  if (isPublicRoute(request)) {
+    return
   }
 
-  // If user hasn't completed onboarding and isn't on onboarding page
-  if (!hasCompletedOnboarding && !isOnboardingRoute(req) && req.nextUrl.pathname !== '/onboarding') {
-    console.log('🔄 Redirecting to onboarding - not completed');
-    return NextResponse.redirect(new URL('/onboarding', req.url))
+  // Protect all routes for authenticated users
+  if (!userId) {
+    return (await auth()).redirectToSignIn()
   }
 
-  // If user has completed onboarding but is on onboarding page
-  if (hasCompletedOnboarding && isOnboardingRoute(req)) {
-    console.log('🔄 Redirecting to dashboard - onboarding already completed');
-    return NextResponse.redirect(new URL('/dashboard', req.url))
+  // ✅ CRITICAL: Check onboarding status from database instead of session claims
+  if (userId && !isOnboardingRoute(request)) {
+    try {
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY! // Use service role for middleware
+      );
+      
+      const { data: onboardingData } = await supabase
+        .from('onboarding')
+        .select('clerk_user_id')
+        .eq('clerk_user_id', userId)
+        .single();
+      
+      if (!onboardingData) {
+        console.log('🔄 Redirecting to onboarding - not found in database');
+        return Response.redirect(new URL('/onboarding', request.url));
+      }
+    } catch (error) {
+      console.error('❌ Database check failed:', error);
+      // On error, allow access to prevent blocking
+    }
+  }
+  
+  // ✅ If user is on onboarding page but already completed (database check)
+  if (userId && isOnboardingRoute(request)) {
+    try {
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
+      
+      const { data: onboardingData } = await supabase
+        .from('onboarding')
+        .select('clerk_user_id')
+        .eq('clerk_user_id', userId)
+        .single();
+      
+      if (onboardingData) {
+        console.log('🚀 Onboarding complete in database, redirecting to dashboard');
+        return Response.redirect(new URL('/dashboard', request.url));
+      }
+    } catch (error) {
+      console.error('❌ Database check failed:', error);
+    }
   }
 
-  console.log('✅ Allowing access to:', req.nextUrl.pathname);
-  return NextResponse.next()
+  return
 })
 
 export const config = {
-  matcher: [
-    '/((?!_next|[^?]*\\.(?:html?|css|js(?!on)|jpe?g|webp|png|gif|svg|ttf|woff2?|ico|csv|docx?|xlsx?|zip|webmanifest)).*)',
-    '/(api|trpc)(.*)',
-  ],
+  matcher: ['/((?!.*\\..*|_next).*)', '/', '/(api|trpc)(.*)'],
 }

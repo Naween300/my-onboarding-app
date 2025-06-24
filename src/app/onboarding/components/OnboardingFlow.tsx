@@ -1,751 +1,801 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { useUser, useAuth } from '@clerk/nextjs';
+import { useState, useEffect } from 'react';
+import { useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
-import { Step1BusinessBasics } from './Step1BusinessBasics';
-import { Step2GoalsStyle } from './Step2GoalsStyle';
-import { Step3BrandSetup } from './Step3BrandSetup';
+import { DropResult } from '@hello-pangea/dnd';
 import { useOnboarding } from '@/hooks/useOnboarding';
-import { DatabaseService } from '@/lib/database';
-import { UserService } from '@/lib/user-service';
 import { useSupabaseClient } from '@/lib/supabase-client';
 
-export const OnboardingFlow: React.FC = () => {
+export const OnboardingFlow = () => {
   const { user, isLoaded } = useUser();
-  const { getToken } = useAuth();
   const router = useRouter();
+  const { data, saveCompleteData, updateData, error: hookError } = useOnboarding();
   const supabase = useSupabaseClient();
   const [currentStep, setCurrentStep] = useState(1);
+  const [formData, setFormData] = useState({
+    businessType: '',
+    businessName: '',
+    locationType: '',
+    location: '',
+    customerType: '',
+    goals: ['📈 Brand awareness', '🎯 Generate leads', '💰 Direct sales', '🤝 Build relationships', '🧠 Thought leadership', '🛠️ Customer support'],
+    rankedGoals: [] as string[],
+    brandPersonality: [] as string[],
+    socialMedia: {
+      facebook: 'none',
+      instagram: 'none',
+      linkedin: 'none'
+    },
+    logo: null,
+    brandColors: { primary: '#3B82F6', secondary: '#EF4444' },
+    contactInfo: { website: '', phone: '', social: '' },
+    budget: 500,
+    timeline: 'steady'
+  });
   const [isCompleting, setIsCompleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isClient, setIsClient] = useState(false);
-  const [showManualNav, setShowManualNav] = useState(false);
-  const [completionTimer, setCompletionTimer] = useState(0);
-  const totalSteps = 3;
-  
-  const {
-    data,
-    isLoading,
-    error: hookError,
-    updateData,
-    saveStepData,
-    saveCompleteData,
-    loadFromDatabase,
-    resetData
-  } = useOnboarding();
 
-  const testClerkSupabaseAuth = async () => {
-    try {
-      const token = await getToken({ template: 'supabase' });
-      
-      console.log('🔍 Clerk JWT Token:', token ? 'Present' : 'Missing');
-      
-      if (token) {
-        // Decode the token to see its contents (for debugging)
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        console.log('🔍 JWT Payload:', payload);
-        console.log('🔍 Role in token:', payload.role);
-      }
-      
-      // Test a simple query with authentication
-      const { data, error } = await supabase
-        .from('onboarding')
-        .select('count')
-        .limit(1);
-        
-      console.log('🔍 Auth test result:', { data, error });
-    } catch (error) {
-      console.error('🔍 Auth test failed:', error);
-    }
-  };
-
-  const debugAuth = async () => {
-    try {
-      const token = await getToken({ template: 'supabase' });
-      
-      console.log('🔍 Debug Auth Results:');
-      console.log('- User ID:', user?.id);
-      console.log('- JWT Token:', token ? 'Present' : 'Missing');
-      
-      if (token) {
-        // Decode the token to see its contents
-        const payload = JSON.parse(atob(token.split('.')[1]));
-        console.log('- JWT Role:', payload.role);
-        console.log('- JWT Payload:', payload);
-      }
-    } catch (error) {
-      console.error('🔍 Auth debug failed:', error);
-    }
-  };
-
+  // Add debug logging to track the issue
   useEffect(() => {
-    setIsClient(true);
-  }, []);
+    console.log('🔍 Onboarding Page Debug:', {
+      userLoaded: isLoaded,
+      userId: user?.id,
+      userMetadata: user?.unsafeMetadata,
+      onboardingComplete: user?.unsafeMetadata?.onboardingComplete,
+      currentPath: typeof window !== 'undefined' ? window.location.pathname : 'server',
+      searchParams: typeof window !== 'undefined' ? window.location.search : 'server',
+      currentStep,
+      isCompleting
+    });
+  }, [isLoaded, user, currentStep, isCompleting]);
 
+  // Debug your form data state
   useEffect(() => {
-    if (isLoaded && user) {
-      initializeUserProfile();
-      testClerkSupabaseAuth();
-      debugAuth();
-    }
-  }, [isLoaded, user]);
+    console.log('🔍 Current formData state:', {
+      businessType: formData.businessType,
+      businessName: formData.businessName,
+      rankedGoals: formData.rankedGoals,
+      brandPersonality: formData.brandPersonality,
+      allFormData: formData
+    });
+  }, [formData]);
 
+  // Add debug logging to track the issue
   useEffect(() => {
-    const savedId = localStorage.getItem('onboardingId');
-    if (savedId && !user) {
-      console.log('📥 Loading existing onboarding data from localStorage...');
-      loadFromDatabase(savedId);
-    }
-  }, [loadFromDatabase, user]);
+    console.log('🔍 Current onboarding state:', {
+      currentStep,
+      userMetadata: user?.unsafeMetadata,
+      onboardingComplete: user?.unsafeMetadata?.onboardingComplete,
+      currentPath: typeof window !== 'undefined' ? window.location.pathname : 'server',
+      isLoaded,
+      userId: user?.id
+    });
+  }, [currentStep, user, isLoaded]);
 
+  // Sync form data with hook data
   useEffect(() => {
-    const testDatabaseConnection = async () => {
-      console.log('🔍 Testing database connection on component mount...');
-      try {
-        const isConnected = await DatabaseService.testConnection();
-        if (!isConnected) {
-          console.error('❌ Database connection failed');
-        } else {
-          console.log('✅ Database connection successful');
-        }
-      } catch (err) {
-        console.error('❌ Database test error:', err);
-      }
-    };
-    testDatabaseConnection();
-  }, []);
-
-  const initializeUserProfile = async () => {
-    if (!user) return;
-
-    try {
-      console.log('👤 Initializing user profile for:', user.id);
-      
-      await UserService.upsertUserProfile(user.id, {
-        email: user.emailAddresses[0]?.emailAddress || '',
-        name: user.fullName || '',
-        avatar_url: user.imageUrl
-      });
-      
-      console.log('✅ User profile initialized in Supabase');
-      
-      // Use authenticated client to load existing onboarding data
-      const { data: existingData, error: loadError } = await supabase
-        .from('onboarding')
-        .select('*')
-        .eq('clerk_user_id', user.id)
-        .single();
-
-      if (loadError) {
-        console.log('📝 No existing onboarding data found for user (this is normal for new users)');
-      } else if (existingData) {
-        console.log('📥 Loading existing onboarding data for user');
-        const formattedData = {
-          businessType: existingData.business_type,
-          businessName: existingData.business_name,
-          locationType: existingData.location_type,
-          location: existingData.location,
-          customerType: existingData.customer_type,
-          goals: existingData.goals,
-          brandPersonality: existingData.brand_personality,
-          socialMediaPresence: existingData.social_media_presence,
-          brandColors: existingData.brand_colors,
-          contactInfo: existingData.contact_info,
-          budget: existingData.budget,
-          timeline: existingData.timeline
-        };
-        updateData(formattedData);
-      }
-    } catch (error) {
-      console.error('❌ Failed to initialize user profile:', error);
-      setError('Failed to initialize user profile');
+    if (data.businessName && data.businessName !== formData.businessName) {
+      setFormData(prev => ({ ...prev, businessName: data.businessName || '' }));
     }
-  };
+    if (data.businessType && data.businessType !== formData.businessType) {
+      setFormData(prev => ({ ...prev, businessType: data.businessType || '' }));
+    }
+  }, [data.businessName, data.businessType]);
 
-  const handleStep1Next = async (step1Data: any) => {
-    if (!user) return;
+  // Update hook data when form data changes
+  const updateFormDataAndHook = (newData: Partial<typeof formData>) => {
+    setFormData(prev => ({ ...prev, ...newData }));
     
+    // Also update the hook data
+    const hookData = {
+      businessName: newData.businessName || formData.businessName,
+      businessType: newData.businessType || formData.businessType,
+      locationType: (newData.locationType || formData.locationType) as 'local' | 'online',
+      location: newData.location || formData.location,
+      customerType: (newData.customerType || formData.customerType) as 'b2b' | 'b2c' | 'both',
+      goals: newData.rankedGoals || formData.rankedGoals,
+      brandPersonality: newData.brandPersonality || formData.brandPersonality,
+      socialMediaPresence: {
+        facebook: formData.socialMedia.facebook as 'none' | 'some' | 'active',
+        instagram: formData.socialMedia.instagram as 'none' | 'some' | 'active',
+        linkedin: formData.socialMedia.linkedin as 'none' | 'some' | 'active'
+      },
+      brandColors: newData.brandColors || formData.brandColors,
+      contactInfo: {
+        website: newData.contactInfo?.website || formData.contactInfo.website,
+        phone: newData.contactInfo?.phone || formData.contactInfo.phone,
+        socialHandles: newData.contactInfo?.social || formData.contactInfo.social
+      },
+      budget: newData.budget || formData.budget,
+      timeline: (newData.timeline || formData.timeline) as 'quick' | 'steady' | 'long-term'
+    };
+    
+    updateData(hookData as any);
+  };
+
+  // Debug panel component
+  const DebugPanel = () => {
+    if (process.env.NODE_ENV !== 'development') return null;
+    
+    return (
+      <div className="fixed bottom-4 right-4 bg-black text-white p-4 rounded-lg text-xs max-w-sm z-50">
+        <h3 className="font-bold mb-2">🔍 Debug Panel</h3>
+        <div className="space-y-1">
+          <div>Step: {currentStep}</div>
+          <div>User ID: {user?.id || 'None'}</div>
+          <div>Onboarding Complete: {user?.unsafeMetadata?.onboardingComplete ? 'Yes' : 'No'}</div>
+          <div>Is Completing: {isCompleting ? 'Yes' : 'No'}</div>
+          <div>Path: {typeof window !== 'undefined' ? window.location.pathname : 'server'}</div>
+        </div>
+        <button
+          onClick={() => {
+            console.log('🔍 Manual debug check:', {
+              user: user,
+              metadata: user?.unsafeMetadata,
+              publicMetadata: user?.publicMetadata
+            });
+          }}
+          className="mt-2 bg-blue-600 px-2 py-1 rounded text-xs"
+        >
+          Log State
+        </button>
+      </div>
+    );
+  };
+
+  // Business type options with emojis
+  const businessTypes = [
+    { id: 'restaurant', emoji: '🍽️', label: 'Restaurant/Food' },
+    { id: 'retail', emoji: '🛍️', label: 'Retail/Store' },
+    { id: 'healthcare', emoji: '🏥', label: 'Healthcare' },
+    { id: 'technology', emoji: '💻', label: 'Tech/Software' },
+    { id: 'professional', emoji: '💼', label: 'Professional Services' },
+    { id: 'creative', emoji: '🎨', label: 'Creative/Design' },
+    { id: 'construction', emoji: '🏗️', label: 'Construction/Home' },
+    { id: 'finance', emoji: '💰', label: 'Finance/Insurance' },
+    { id: 'education', emoji: '📚', label: 'Education' },
+    { id: 'automotive', emoji: '🚗', label: 'Automotive' },
+    { id: 'manufacturing', emoji: '🏭', label: 'Manufacturing' },
+    { id: 'nonprofit', emoji: '❤️', label: 'Non-profit' },
+    { id: 'travel', emoji: '✈️', label: 'Travel/Tourism' },
+    { id: 'beauty', emoji: '💄', label: 'Beauty/Fashion' },
+    { id: 'entertainment', emoji: '🎬', label: 'Entertainment' }
+  ];
+
+  const brandPersonalities = [
+    '💼 Professional', '😊 Friendly', '🎨 Creative', 
+    '🚀 Innovative', '🌱 Authentic', '✨ Premium'
+  ];
+
+  const handleDragEnd = (result: DropResult) => {
+    if (!result.destination) return;
+    const items = Array.from(formData.rankedGoals);
+    const [reorderedItem] = items.splice(result.source.index, 1);
+    items.splice(result.destination.index, 0, reorderedItem);
+    setFormData({ ...formData, rankedGoals: items });
+  };
+
+  // ✅ Create a direct database save function
+  const saveToDatabase = async (data: any) => {
     try {
-      updateData(step1Data);
-      
-      console.log('💾 Saving Step 1 data for user:', user.id);
-      console.log('📝 Step 1 data:', step1Data);
-      
-      // ✅ Use returning: 'minimal' to prevent automatic SELECT
-      const { data, error } = await supabase
+      // Save to user_profiles
+      const { error: userError } = await supabase
+        .from('user_profiles')
+        .upsert({
+          clerk_user_id: user?.id,
+          email: user?.primaryEmailAddress?.emailAddress,
+          name: user?.fullName || data.businessName,
+          avatar_url: user?.imageUrl,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'clerk_user_id' });
+
+      if (userError) throw new Error(userError.message);
+
+      // Save to onboarding
+      const { error: onboardingError } = await supabase
         .from('onboarding')
         .upsert({
-          clerk_user_id: user.id,
-          business_type: step1Data.businessType,
-          business_name: step1Data.businessName,
-          location_type: step1Data.locationType || 'online',
-          location: step1Data.location,
-          customer_type: step1Data.customerType || 'b2c',
-          goals: step1Data.goals || [],
-          brand_personality: step1Data.brandPersonality || [],
-          social_media_presence: step1Data.socialMediaPresence || {
-            facebook: 'none',
-            instagram: 'none',
-            linkedin: 'none'
-          },
-          brand_colors: step1Data.brandColors || {
-            primary: '#3B82F6',
-            secondary: '#EF4444'
-          },
-          contact_info: step1Data.contactInfo || {},
-          budget: step1Data.budget || 500,
-          timeline: step1Data.timeline || 'steady',
+          clerk_user_id: user?.id,
+          business_name: data.businessName,
+          business_type: data.businessType,
+          location_type: data.locationType,
+          location: data.location,
+          customer_type: data.customerType,
+          goals: data.goals,
+          brand_personality: data.brandPersonality,
+          social_media_presence: data.socialMediaPresence,
+          brand_colors: data.brandColors,
+          contact_info: data.contactInfo,
+          budget: data.budget,
+          timeline: data.timeline,
           updated_at: new Date().toISOString()
-        }, { 
-          onConflict: 'clerk_user_id' // ✅ Specify conflict resolution
-        });
+        }, { onConflict: 'clerk_user_id' });
 
-      if (error) {
-        console.error('❌ Failed to save Step 1 to Supabase:', error);
-        console.error('❌ Error details:', {
-          message: error.message || 'Unknown error',
-          code: error.code || 'NO_CODE',
-          details: error.details || 'No details'
-        });
-        
-        // Enhanced error handling for empty error objects
-        if (Object.keys(error).length === 0 || !error.message) {
-          setError('Authentication issue: Please try refreshing the page and logging in again.');
-          return;
-        }
-        
-        setError(`Database error: ${error.message || 'Unknown database error'}`);
-        return;
-      }
-      
-      console.log('✅ Step 1 saved to Supabase successfully');
-      setCurrentStep(2);
+      if (onboardingError) throw new Error(onboardingError.message);
+
+      return true;
     } catch (error) {
-      console.error('❌ Error in handleStep1Next:', error);
-      setError('Failed to save Step 1 data');
+      console.error('❌ Database save error:', error);
+      return false;
     }
   };
 
-  // Add validation before saving
-  const validateStep2Data = (step2Data: any) => {
-    const requiredFields = ['goals', 'brandPersonality', 'socialMediaPresence'];
-    
-    for (const field of requiredFields) {
-      if (!step2Data[field]) {
-        console.warn(`⚠️ Missing required field: ${field}`);
-      }
-    }
-    
-    return {
-      goals: Array.isArray(step2Data.goals) ? step2Data.goals : [],
-      brandPersonality: Array.isArray(step2Data.brandPersonality) ? step2Data.brandPersonality : [],
-      socialMediaPresence: step2Data.socialMediaPresence || {
-        facebook: 'none',
-        instagram: 'none',
-        linkedin: 'none'
-      }
-    };
-  };
-
-  const handleStep2Next = async (step2Data: any) => {
+  const handleOnboardingComplete = async () => {
+    if (isCompleting) return;
     if (!user) return;
     
+    setIsCompleting(true);
+    setError(null);
+    
     try {
-      // ✅ Validate and normalize Step 2 data
-      const validatedStep2Data = validateStep2Data(step2Data);
+      console.log('🎉 Starting onboarding completion...');
       
-      updateData(validatedStep2Data);
-      
-      // ✅ Debug logging
-      console.log('🔍 Debug Info:');
-      console.log('- User ID:', user.id);
-      console.log('- Current data state:', JSON.stringify(data, null, 2));
-      console.log('- Step 2 data (original):', JSON.stringify(step2Data, null, 2));
-      console.log('- Step 2 data (validated):', JSON.stringify(validatedStep2Data, null, 2));
-      
-      // Check if we have existing data from Step 1
-      if (!data.businessType || !data.businessName) {
-        console.error('❌ Missing Step 1 data!');
-        console.error('- businessType:', data.businessType);
-        console.error('- businessName:', data.businessName);
-        setError('Missing business information from Step 1. Please go back and complete Step 1.');
-        return;
-      }
-      
-      console.log('💾 Saving Step 2 data for user:', user.id);
-      
-      // ✅ Merge all existing data with validated step2Data
+      // ✅ Prepare complete data from form state
       const completeData = {
-        clerk_user_id: user.id,
-        // Step 1 data (preserve existing)
-        business_type: data.businessType,
-        business_name: data.businessName,
-        location_type: data.locationType || 'online',
-        location: data.location,
-        customer_type: data.customerType || 'b2c',
-        
-        // Step 2 data (validated)
-        goals: validatedStep2Data.goals,
-        brand_personality: validatedStep2Data.brandPersonality,
-        social_media_presence: validatedStep2Data.socialMediaPresence,
-        
-        // Default values for Step 3 (will be updated later)
-        brand_colors: data.brandColors || {
-          primary: '#3B82F6',
-          secondary: '#EF4444'
-        },
-        contact_info: data.contactInfo || {},
-        budget: data.budget || 500,
-        timeline: data.timeline || 'steady',
-        updated_at: new Date().toISOString()
+        businessType: formData.businessType,
+        businessName: formData.businessName,
+        locationType: formData.locationType || 'online',
+        location: formData.location || '',
+        customerType: formData.customerType,
+        goals: formData.rankedGoals || [],
+        brandPersonality: formData.brandPersonality || [],
+        socialMediaPresence: formData.socialMedia || {},
+        brandColors: formData.brandColors || { primary: '#3B82F6', secondary: '#EF4444' },
+        contactInfo: formData.contactInfo || { website: '', phone: '', social: '' },
+        budget: formData.budget || 500,
+        timeline: formData.timeline || 'steady'
       };
 
-      console.log('📝 Complete data to save:', JSON.stringify(completeData, null, 2));
+      console.log('🔍 Complete data prepared:', completeData);
 
-      // ✅ Specify the conflict target for proper upsert behavior
-      const { data: result, error } = await supabase
-        .from('onboarding')
-        .upsert(completeData, { 
-          onConflict: 'clerk_user_id' // ✅ Specify conflict resolution
-        });
+      // ✅ CRITICAL: Validate the prepared data directly (not state)
+      const missingFields = [];
+      if (!completeData.businessType) missingFields.push('businessType');
+      if (!completeData.businessName) missingFields.push('businessName');
+      if (!completeData.goals || completeData.goals.length === 0) missingFields.push('goals');
+      if (!completeData.brandPersonality || completeData.brandPersonality.length === 0) missingFields.push('brandPersonality');
 
-      if (error) {
-        console.error('❌ Failed to save Step 2 to Supabase:', error);
-        console.error('❌ Error details:', {
-          message: error.message || 'Unknown error',
-          code: error.code || 'NO_CODE',
-          details: error.details || 'No details',
-          hint: error.hint || 'No hint'
-        });
-        
-        // Enhanced error handling for empty error objects
-        if (Object.keys(error).length === 0 || !error.message) {
-          setError('Authentication issue: Please try refreshing the page and logging in again.');
-          return;
-        }
-        
-        setError(`Database error: ${error.message || 'Unknown database error'}`);
-        return;
-      }
-      
-      console.log('✅ Step 2 saved to Supabase successfully');
-      setCurrentStep(3);
-    } catch (error) {
-      console.error('❌ Error in handleStep2Next:', error);
-      setError('Failed to save Step 2 data');
-    }
-  };
-
-  const handleStep2Back = () => {
-    console.log('⬅️ Going back to Step 1');
-    setCurrentStep(1);
-  };
-
-  const handleStep3Submit = async (step3Data: any) => {
-    if (!user) return;
-
-    setIsCompleting(true);
-    try {
-      const completeData = { ...data, ...step3Data };
-      updateData(step3Data);
-      
-      console.log('🏁 Starting final submission process...');
-      console.log('👤 Current user metadata before update:', user.unsafeMetadata);
-      
-      // Save to Supabase first
-      const { data: result, error } = await supabase
-        .from('onboarding')
-        .upsert({
-          clerk_user_id: user.id,
-          business_type: completeData.businessType,
-          business_name: completeData.businessName,
-          location_type: completeData.locationType || 'online',
-          location: completeData.location,
-          customer_type: completeData.customerType || 'b2c',
-          goals: completeData.goals || [],
-          brand_personality: completeData.brandPersonality || [],
-          social_media_presence: completeData.socialMediaPresence || {
-            facebook: 'none',
-            instagram: 'none',
-            linkedin: 'none'
-          },
-          brand_colors: step3Data.brandColors || {
-            primary: '#3B82F6',
-            secondary: '#EF4444'
-          },
-          contact_info: step3Data.contactInfo || {},
-          budget: step3Data.budget || 500,
-          timeline: step3Data.timeline || 'steady',
-          updated_at: new Date().toISOString()
-        }, { 
-          onConflict: 'clerk_user_id'
-        });
-
-      if (error) {
-        console.error('❌ Failed to save onboarding data:', error);
-        setError('Failed to save onboarding data. Please try again.');
+      if (missingFields.length > 0) {
+        console.error('❌ Missing required fields:', missingFields);
+        console.error('❌ Current formData:', formData);
+        setError(`Please complete: ${missingFields.join(', ')}`);
         return;
       }
 
-      console.log('✅ Data saved to Supabase successfully');
+      console.log('✅ All required fields present');
 
-      // ✅ Enhanced Clerk metadata update
-      console.log('🔄 Updating Clerk user metadata...');
+      // ✅ Save directly to database with validated data
+      const success = await saveToDatabase(completeData);
       
-      try {
-        const updatedMetadata = {
-          ...user.unsafeMetadata,
-          onboardingComplete: true,
-          businessName: completeData.businessName,
-          businessType: completeData.businessType,
-          completedAt: new Date().toISOString()
-        };
-        
-        console.log('📝 Metadata to update:', updatedMetadata);
-        
-        await user.update({
-          unsafeMetadata: updatedMetadata
-        });
-        
-        console.log('✅ Clerk metadata update called successfully');
-        
-        // ✅ Wait longer for metadata to propagate
-        console.log('⏳ Waiting for metadata to propagate...');
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        // ✅ Reload the user to get fresh metadata
-        await user.reload();
-        
-        console.log('🔍 Updated user metadata after reload:', user.unsafeMetadata);
-        console.log('🔍 Onboarding complete status:', user.unsafeMetadata?.onboardingComplete);
-        
-        // ✅ Verify the metadata was actually updated
-        if (!user.unsafeMetadata?.onboardingComplete) {
-          console.error('❌ Metadata update failed - onboardingComplete still undefined');
-          setError('Failed to update completion status. Please try again.');
-          return;
-        }
-        
-      } catch (metadataError) {
-        console.error('❌ Failed to update Clerk metadata:', metadataError);
-        setError('Failed to update user profile. Please try again.');
+      if (!success) {
+        setError('Failed to save onboarding data to database');
         return;
       }
 
-      const brandName = completeData.businessName;
-      if (brandName) {
-        localStorage.setItem('brandName', brandName);
-        localStorage.setItem('onboardingCompleted', 'true');
-        localStorage.setItem('completionDate', new Date().toISOString());
-        console.log('💾 Brand information stored for dashboard');
-      }
+      console.log('✅ Database save successful');
 
-      // ✅ Store completion in localStorage as backup
-      localStorage.setItem('onboardingCompleted', 'true');
-      localStorage.setItem('completionTimestamp', Date.now().toString());
-      
-      console.log('🔄 Starting navigation to dashboard...');
-      
-      // ✅ Use multiple navigation methods
-      try {
-        // Method 1: Router push with cache bypass
-        await router.push(`/dashboard?completed=${Date.now()}`);
-        console.log('✅ Router navigation initiated');
-      } catch (routerError) {
-        console.warn('⚠️ Router failed, using window.location');
-        // Method 2: Direct window location
-        window.location.href = `/dashboard?completed=${Date.now()}`;
-      }
-      
-    } catch (error) {
-      console.error('❌ Error in handleStep3Submit:', error);
-      setError('An unexpected error occurred. Please try again.');
+      // ✅ DON'T update Clerk metadata - causes cookie size issues
+      // await user.update({ unsafeMetadata: { onboardingComplete: true } });
+
+      // ✅ Direct redirect to dashboard with bypass parameter
+      window.location.href = '/dashboard?onboarding=completed';
+
+    } catch (error: any) {
+      console.error('❌ Completion error:', error);
+      setError(`Error: ${error.message}`);
     } finally {
       setIsCompleting(false);
     }
   };
 
-  const handleStep3Back = () => {
-    console.log('⬅️ Going back to Step 2');
-    setCurrentStep(2);
-  };
+  const requiredFields = ['businessType', 'businessName', 'goals', 'brandPersonality'];
+  const missingFields = requiredFields.filter(field => {
+    const value = (data as any)[field];
+    return !value || (Array.isArray(value) && value.length === 0);
+  });
 
-  const progressPercentage = Math.round((currentStep / totalSteps) * 100);
+  const onboardingComplete = user?.unsafeMetadata?.onboardingComplete;
 
-  // Timer effect for manual navigation fallback
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    
-    if (isCompleting) {
-      setShowManualNav(false);
-      setCompletionTimer(0);
-      
-      interval = setInterval(() => {
-        setCompletionTimer(prev => {
-          const newTime = prev + 1;
-          if (newTime >= 5) {
-            setShowManualNav(true);
-          }
-          return newTime;
-        });
-      }, 1000);
-    } else {
-      setShowManualNav(false);
-      setCompletionTimer(0);
+    // ✅ If debug panel shows completion, force redirect
+    if (user?.unsafeMetadata?.onboardingComplete) {
+      console.log('🚀 Client-side: Onboarding complete, redirecting...');
+      window.location.replace('/dashboard?onboarding=completed');
     }
-
-    return () => {
-      if (interval) {
-        clearInterval(interval);
-      }
-    };
-  }, [isCompleting]);
-
-  const renderCurrentStep = () => {
-    switch (currentStep) {
-      case 1:
-        return (
-          <Step1BusinessBasics
-            key="step-1"
-            data={data}
-            onNext={handleStep1Next}
-          />
-        );
-      case 2:
-        return (
-          <Step2GoalsStyle
-            key="step-2"
-            data={data}
-            onNext={handleStep2Next}
-            onBack={handleStep2Back}
-          />
-        );
-      case 3:
-        return (
-          <Step3BrandSetup
-            key="step-3"
-            data={data}
-            onSubmit={handleStep3Submit}
-            onBack={handleStep3Back}
-            isCompleting={isCompleting}
-          />
-        );
-      default:
-        return (
-          <div className="text-center py-8">
-            <p className="text-red-600">Invalid step: {currentStep}</p>
-            <button 
-              onClick={() => setCurrentStep(1)}
-              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-md"
-            >
-              Go to Step 1
-            </button>
-          </div>
-        );
-    }
-  };
-
-  const safeRenderObject = (obj: any, fallback = 'No data available') => {
-    if (!obj) return fallback;
-    if (typeof obj === 'string' || typeof obj === 'number') return obj;
-    if (Array.isArray(obj)) return obj.join(', ');
-    if (typeof obj === 'object') {
-      return Object.entries(obj).map(([key, value]) => (
-        <div key={key}>
-          <span className="font-medium">{key}:</span> {String(value)}
-        </div>
-      ));
-    }
-    return String(obj);
-  };
-
-  if (!isLoaded || !isClient) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center" suppressHydrationWarning>
-        <div className="text-center" suppressHydrationWarning>
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" suppressHydrationWarning></div>
-          <p className="text-gray-600">Loading your onboarding...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center" suppressHydrationWarning>
-        <div className="text-center" suppressHydrationWarning>
-          <p className="text-red-600 mb-4">Authentication required</p>
-          <button 
-            onClick={() => router.push('/sign-in')}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md"
-          >
-            Sign In
-          </button>
-        </div>
-      </div>
-    );
-  }
+  }, [user]);
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8" suppressHydrationWarning>
-      <div className="max-w-4xl mx-auto px-4" suppressHydrationWarning>
-        <div className="text-center mb-8" suppressHydrationWarning>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Welcome to SME Intelligence, {user.firstName}!
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50" suppressHydrationWarning>
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">
+            Welcome to SME Intelligence
           </h1>
-          <p className="text-gray-600">
-            Let's set up your business profile to get personalized AI insights
+          <p className="text-xl text-gray-600">
+            Let's set up your AI-powered business profile
           </p>
-          <div className="mt-4 flex items-center justify-center space-x-2" suppressHydrationWarning>
-            <img
-              src={user.imageUrl}
-              alt="Profile"
-              className="w-8 h-8 rounded-full"
-            />
-            <span className="text-sm text-gray-500">
-              {user.emailAddresses[0]?.emailAddress}
-            </span>
-          </div>
         </div>
 
-        <div className="mb-8" suppressHydrationWarning>
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-sm font-medium text-gray-600">
-              Step {currentStep} of {totalSteps}
-            </span>
-            <span className="text-sm text-gray-500">
-              {progressPercentage}% Complete
-            </span>
-          </div>
-          <div className="w-full bg-gray-200 rounded-full h-2">
+        {/* Progress Indicator */}
+        <div className="flex items-center justify-center space-x-4 mb-8">
+          {[1, 2, 3].map((step) => (
             <div
-              className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-              style={{ width: `${progressPercentage}%` }}
-            />
-          </div>
-          
-          <div className="flex justify-between mt-4">
-            {[1, 2, 3].map((step) => (
-              <div key={step} className="flex items-center">
-                <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-all duration-200 ${
-                    step < currentStep
-                      ? 'bg-green-500 text-white'
-                      : step === currentStep
-                      ? 'bg-blue-600 text-white'
-                      : 'bg-gray-200 text-gray-500'
-                  }`}
-                >
-                  {step < currentStep ? '✓' : step}
-                </div>
-                <span
-                  className={`ml-2 text-sm font-medium ${
-                    step <= currentStep ? 'text-gray-900' : 'text-gray-500'
-                  }`}
-                >
-                  {step === 1 && 'Business Basics'}
-                  {step === 2 && 'Goals & Style'}
-                  {step === 3 && 'Brand Setup'}
-                </span>
-              </div>
-            ))}
-          </div>
+              key={step}
+              className={`w-12 h-12 rounded-full flex items-center justify-center text-sm font-medium transition-all ${
+                step <= currentStep
+                  ? 'bg-blue-600 text-white shadow-lg transform scale-110'
+                  : 'bg-gray-200 text-gray-600'
+              }`}
+            >
+              {step}
+            </div>
+          ))}
         </div>
 
-        {(isLoading || isCompleting) && (
-          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="flex items-center">
-              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-3"></div>
-              <p className="text-blue-600 text-sm">
-                {isCompleting ? 'Completing your setup...' : 'Saving your progress...'}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {(error || hookError) && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg" suppressHydrationWarning>
-            <div className="flex items-center">
-              <div className="text-red-400 text-xl mr-3">⚠️</div>
-              <div>
-                <p className="text-red-600 text-sm font-medium">Error occurred</p>
-                <p className="text-red-600 text-sm">{error || hookError}</p>
+        {/* Step Content */}
+        <div className="max-w-4xl mx-auto">
+          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden">
+            {/* Step 1: Business Basics */}
+            {currentStep === 1 && (
+              <div className="p-8">
+                <div className="text-center mb-8">
+                  <h2 className="text-3xl font-bold text-gray-900 mb-2">
+                    Step 1: Business Basics
+                  </h2>
+                  <p className="text-gray-600 text-lg">What's your business?</p>
+                </div>
+                {/* Business Type Grid - 5x3 */}
+                <div className="mb-8">
+                  <h3 className="text-lg font-semibold mb-4">Choose your business type:</h3>
+                  <div className="grid grid-cols-5 gap-3">
+                    {businessTypes.map((type) => (
+                      <button
+                        key={type.id}
+                        onClick={() => setFormData({ ...formData, businessType: type.id })}
+                        className={`p-4 rounded-lg border-2 transition-all hover:scale-105 ${
+                          formData.businessType === type.id
+                            ? 'border-blue-500 bg-blue-50 shadow-lg'
+                            : 'border-gray-200 hover:border-blue-300'
+                        }`}
+                      >
+                        <div className="text-2xl mb-2">{type.emoji}</div>
+                        <div className="text-xs font-medium text-center">{type.label}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {/* Business Name */}
+                <div className="mb-6">
+                  <label className="block text-lg font-semibold text-gray-700 mb-3">
+                    Business Name:
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.businessName}
+                    onChange={(e) => setFormData({ ...formData, businessName: e.target.value })}
+                    className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg"
+                    placeholder="Enter your business name"
+                  />
+                </div>
+                {/* Location */}
+                <div className="mb-6">
+                  <h3 className="text-lg font-semibold mb-4">Location:</h3>
+                  <div className="flex gap-4 mb-4">
+                    <button
+                      onClick={() => setFormData({ ...formData, locationType: 'local' })}
+                      className={`flex-1 p-4 rounded-lg border-2 transition-all ${
+                        formData.locationType === 'local'
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 hover:border-blue-300'
+                      }`}
+                    >
+                      <div className="text-2xl mb-2">📍</div>
+                      <div className="font-medium">Local business in:</div>
+                    </button>
+                    <button
+                      onClick={() => setFormData({ ...formData, locationType: 'online' })}
+                      className={`flex-1 p-4 rounded-lg border-2 transition-all ${
+                        formData.locationType === 'online'
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 hover:border-blue-300'
+                      }`}
+                    >
+                      <div className="text-2xl mb-2">🌐</div>
+                      <div className="font-medium">Online/Remote</div>
+                    </button>
+                  </div>
+                  {formData.locationType === 'local' && (
+                    <input
+                      type="text"
+                      value={formData.location}
+                      onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                      className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      placeholder="Enter your city/location"
+                    />
+                  )}
+                </div>
+                {/* Customer Type */}
+                <div className="mb-8">
+                  <h3 className="text-lg font-semibold mb-4">You serve:</h3>
+                  <div className="grid grid-cols-3 gap-4">
+                    {[
+                      { id: 'b2b', emoji: '🏢', label: 'Businesses (B2B)' },
+                      { id: 'b2c', emoji: '👥', label: 'Consumers (B2C)' },
+                      { id: 'both', emoji: '🔄', label: 'Both' }
+                    ].map((type) => (
+                      <button
+                        key={type.id}
+                        onClick={() => setFormData({ ...formData, customerType: type.id })}
+                        className={`p-4 rounded-lg border-2 transition-all ${
+                          formData.customerType === type.id
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-gray-200 hover:border-blue-300'
+                        }`}
+                      >
+                        <div className="text-2xl mb-2">{type.emoji}</div>
+                        <div className="font-medium">{type.label}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <button
+                  onClick={() => setCurrentStep(2)}
+                  disabled={!formData.businessType || !formData.businessName || !formData.locationType || !formData.customerType || isCompleting}
+                  className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-4 px-6 rounded-lg font-semibold text-lg hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 transform hover:scale-105"
+                >
+                  Continue to Goals & Style →
+                </button>
               </div>
-            </div>
-          </div>
-        )}
-
-        {isCompleting && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg p-8 max-w-md mx-4 text-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Completing Your Setup
-              </h3>
-              <p className="text-gray-600 mb-4">
-                We're finalizing your business profile and preparing your dashboard...
-              </p>
-              
-              {/* Countdown timer */}
-              <div className="text-sm text-gray-500 mb-4">
-                {completionTimer < 5 ? (
-                  <span>Please wait... ({5 - completionTimer}s)</span>
-                ) : (
-                  <span className="text-orange-600 font-medium">
-                    Taking longer than expected
-                  </span>
-                )}
-              </div>
-              
-              {/* Manual navigation button after 5 seconds */}
-              {showManualNav && (
-                <div className="space-y-3">
-                  <p className="text-sm text-gray-600">
-                    If you're still waiting, you can manually navigate to your dashboard:
-                  </p>
+            )}
+            {/* Step 2: Goals & Style */}
+            {currentStep === 2 && (
+              <div className="p-8">
+                <div className="text-center mb-8">
+                  <h2 className="text-3xl font-bold text-gray-900 mb-2">
+                    Step 2: Goals & Style
+                  </h2>
+                  <p className="text-gray-600 text-lg">Define your objectives and personality</p>
+                </div>
+                {/* Top 3 Goals - Drag to Rank */}
+                <div className="mb-8">
+                  <h3 className="text-lg font-semibold mb-4">Top 3 goals: (Drag to rank)</h3>
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    {formData.goals.map((goal) => (
+                      <button
+                        key={goal}
+                        onClick={() => {
+                          if (formData.rankedGoals.includes(goal)) {
+                            setFormData({
+                              ...formData,
+                              rankedGoals: formData.rankedGoals.filter(g => g !== goal)
+                            });
+                          } else if (formData.rankedGoals.length < 3) {
+                            setFormData({
+                              ...formData,
+                              rankedGoals: [...formData.rankedGoals, goal]
+                            });
+                          }
+                        }}
+                        className={`p-3 rounded-lg border-2 transition-all text-left ${
+                          formData.rankedGoals.includes(goal)
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-gray-200 hover:border-blue-300'
+                        }`}
+                      >
+                        {goal}
+                        {formData.rankedGoals.includes(goal) && (
+                          <span className="ml-2 bg-blue-600 text-white px-2 py-1 rounded-full text-xs">
+                            #{formData.rankedGoals.indexOf(goal) + 1}
+                          </span>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {/* Brand Personality */}
+                <div className="mb-8">
+                  <h3 className="text-lg font-semibold mb-4">Brand personality: (Multi-select)</h3>
+                  <div className="grid grid-cols-3 gap-3">
+                    {brandPersonalities.map((personality) => (
+                      <button
+                        key={personality}
+                        onClick={() => {
+                          if (formData.brandPersonality.includes(personality)) {
+                            setFormData({
+                              ...formData,
+                              brandPersonality: formData.brandPersonality.filter(p => p !== personality)
+                            });
+                          } else {
+                            setFormData({
+                              ...formData,
+                              brandPersonality: [...formData.brandPersonality, personality]
+                            });
+                          }
+                        }}
+                        className={`p-3 rounded-lg border-2 transition-all ${
+                          formData.brandPersonality.includes(personality)
+                            ? 'border-blue-500 bg-blue-50'
+                            : 'border-gray-200 hover:border-blue-300'
+                        }`}
+                      >
+                        {personality}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {/* Social Media Status */}
+                <div className="mb-8">
+                  <h3 className="text-lg font-semibold mb-4">Current social media:</h3>
+                  <div className="space-y-4">
+                    {Object.entries(formData.socialMedia).map(([platform, status]) => (
+                      <div key={platform} className="flex items-center justify-between p-4 border rounded-lg">
+                        <span className="font-medium capitalize">{platform}:</span>
+                        <div className="flex gap-2">
+                          {['none', 'some', 'active'].map((level) => (
+                            <button
+                              key={level}
+                              onClick={() => setFormData({
+                                ...formData,
+                                socialMedia: { ...formData.socialMedia, [platform]: level }
+                              })}
+                              className={`w-8 h-8 rounded-full border-2 transition-all ${
+                                status === level
+                                  ? level === 'none' ? 'bg-gray-400 border-gray-400'
+                                    : level === 'some' ? 'bg-yellow-400 border-yellow-400'
+                                    : 'bg-green-400 border-green-400'
+                                  : 'border-gray-300'
+                              }`}
+                            >
+                              {status === level && (
+                                level === 'none' ? '⚪' : level === 'some' ? '🟡' : '🟢'
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="flex gap-4">
                   <button
-                    onClick={() => {
-                      console.log('🚀 Manual navigation to dashboard triggered');
-                      window.location.href = '/dashboard';
-                    }}
-                    className="px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium"
+                    onClick={() => setCurrentStep(1)}
+                    disabled={isCompleting}
+                    className="flex-1 bg-gray-300 text-gray-700 py-4 px-6 rounded-lg font-semibold hover:bg-gray-400 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Go to Dashboard Manually
+                    ← Back
                   </button>
-                  <p className="text-xs text-gray-500">
-                    Your data has been saved and will be available in the dashboard
-                  </p>
+                  <button
+                    onClick={() => setCurrentStep(3)}
+                    disabled={formData.rankedGoals.length < 3 || formData.brandPersonality.length === 0 || isCompleting}
+                    className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white py-4 px-6 rounded-lg font-semibold hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+                  >
+                    Continue to Brand Setup →
+                  </button>
                 </div>
-              )}
-            </div>
+              </div>
+            )}
+            {/* Step 3: Brand Setup */}
+            {currentStep === 3 && (
+              <div className="p-8">
+                <div className="text-center mb-8">
+                  <h2 className="text-3xl font-bold text-gray-900 mb-2">
+                    Step 3: Brand Setup
+                  </h2>
+                  <p className="text-gray-600 text-lg">Final touches for your brand</p>
+                </div>
+                {/* Logo Upload */}
+                <div className="mb-8">
+                  <h3 className="text-lg font-semibold mb-4">Upload logo:</h3>
+                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 transition-all">
+                    <div className="text-4xl mb-4">📁</div>
+                    <p className="text-gray-600">Drag & drop your logo here, or click to browse</p>
+                    <input type="file" className="hidden" accept="image/*" />
+                  </div>
+                </div>
+                {/* Brand Colors */}
+                <div className="mb-8">
+                  <h3 className="text-lg font-semibold mb-4">Brand colors:</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Primary:</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={formData.brandColors.primary}
+                          onChange={(e) => setFormData({
+                            ...formData,
+                            brandColors: { ...formData.brandColors, primary: e.target.value }
+                          })}
+                          className="w-12 h-12 rounded-lg border-2 border-gray-300"
+                        />
+                        <input
+                          type="text"
+                          value={formData.brandColors.primary}
+                          onChange={(e) => setFormData({
+                            ...formData,
+                            brandColors: { ...formData.brandColors, primary: e.target.value }
+                          })}
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Secondary:</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={formData.brandColors.secondary}
+                          onChange={(e) => setFormData({
+                            ...formData,
+                            brandColors: { ...formData.brandColors, secondary: e.target.value }
+                          })}
+                          className="w-12 h-12 rounded-lg border-2 border-gray-300"
+                        />
+                        <input
+                          type="text"
+                          value={formData.brandColors.secondary}
+                          onChange={(e) => setFormData({
+                            ...formData,
+                            brandColors: { ...formData.brandColors, secondary: e.target.value }
+                          })}
+                          className="flex-1 px-3 py-2 border border-gray-300 rounded-lg"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {/* Contact Info */}
+                <div className="mb-8">
+                  <h3 className="text-lg font-semibold mb-4">Contact info:</h3>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Website:</label>
+                      <input
+                        type="url"
+                        value={formData.contactInfo.website}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          contactInfo: { ...formData.contactInfo, website: e.target.value }
+                        })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                        placeholder="https://..."
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Phone:</label>
+                      <input
+                        type="tel"
+                        value={formData.contactInfo.phone}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          contactInfo: { ...formData.contactInfo, phone: e.target.value }
+                        })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                        placeholder="+1 (555) 123-4567"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Social handles:</label>
+                      <input
+                        type="text"
+                        value={formData.contactInfo.social}
+                        onChange={(e) => setFormData({
+                          ...formData,
+                          contactInfo: { ...formData.contactInfo, social: e.target.value }
+                        })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                        placeholder="@yourbusiness"
+                      />
+                    </div>
+                  </div>
+                </div>
+                {/* Budget & Timeline */}
+                <div className="mb-8">
+                  <h3 className="text-lg font-semibold mb-4">Budget & timeline:</h3>
+                  {/* Budget Slider */}
+                  <div className="mb-6">
+                    <label className="block text-sm font-medium mb-2">
+                      Monthly budget: ${formData.budget}
+                    </label>
+                    <input
+                      type="range"
+                      min="0"
+                      max="2000"
+                      step="100"
+                      value={formData.budget}
+                      onChange={(e) => setFormData({ ...formData, budget: parseInt(e.target.value) })}
+                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                    />
+                    <div className="flex justify-between text-xs text-gray-500 mt-1">
+                      <span>$0</span>
+                      <span>$100</span>
+                      <span>$500</span>
+                      <span>$1000+</span>
+                    </div>
+                  </div>
+                  {/* Timeline */}
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Results timeline:</label>
+                    <div className="grid grid-cols-3 gap-4">
+                      {[
+                        { id: 'quick', emoji: '🏃', label: 'Quick (1-3mo)' },
+                        { id: 'steady', emoji: '📈', label: 'Steady (3-6mo)' },
+                        { id: 'longterm', emoji: '🏗️', label: 'Long-term (6+mo)' }
+                      ].map((option) => (
+                        <button
+                          key={option.id}
+                          onClick={() => setFormData({ ...formData, timeline: option.id })}
+                          className={`p-4 rounded-lg border-2 transition-all ${
+                            formData.timeline === option.id
+                              ? 'border-blue-500 bg-blue-50'
+                              : 'border-gray-200 hover:border-blue-300'
+                          }`}
+                        >
+                          <div className="text-2xl mb-2">{option.emoji}</div>
+                          <div className="font-medium text-sm">{option.label}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  {(error || hookError) && (
+                    <div className="mb-4 bg-red-50 border border-red-200 rounded-lg p-4">
+                      <div className="flex">
+                        <div className="text-red-400">⚠️</div>
+                        <div className="ml-3">
+                          <h3 className="text-sm font-medium text-red-800">
+                            Onboarding Error
+                          </h3>
+                          <div className="mt-2 text-sm text-red-700">
+                            {error || hookError}
+                          </div>
+                          <button 
+                            onClick={() => setError(null)}
+                            className="text-red-600 underline text-sm mt-2"
+                          >
+                            Try Again
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                  <div className="flex gap-4">
+                    <button
+                      onClick={() => setCurrentStep(2)}
+                      disabled={isCompleting}
+                      className="flex-1 bg-gray-300 text-gray-700 py-4 px-6 rounded-lg font-semibold hover:bg-gray-400 transition-all disabled:opacity-50"
+                    >
+                      ← Back
+                    </button>
+                    <button
+                      onClick={handleOnboardingComplete}
+                      disabled={isCompleting}
+                      className={`flex-1 py-4 px-6 rounded-lg font-semibold transition-all ${
+                        isCompleting 
+                          ? 'bg-gray-400 cursor-not-allowed' 
+                          : 'bg-gradient-to-r from-green-600 to-emerald-600 text-white hover:from-green-700 hover:to-emerald-700 transform hover:scale-105'
+                      }`}
+                    >
+                      {isCompleting ? (
+                        <div className="flex items-center justify-center">
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+                          Completing Setup...
+                        </div>
+                      ) : (
+                        '🚀 Complete Setup & Launch!'
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
-        )}
-
-        <div className="bg-white rounded-lg shadow-sm p-8" suppressHydrationWarning>
-          {renderCurrentStep()}
-        </div>
-
-        <div className="mt-6 text-center">
-          <p className="text-sm text-gray-500">
-            Your progress is automatically saved as you go
-          </p>
         </div>
       </div>
-    </div>
-  );
-};
-
-const renderAnalytics = (analytics: any) => {
-  if (!analytics || typeof analytics !== 'object') {
-    return <p>No analytics data available</p>;
-  }
-  return (
-    <div>
-      <p>Optimal Time: {analytics.optimal_time}</p>
-      <p>Predicted Engagement: {analytics.predicted_engagement}</p>
-      <p>Day of Week: {analytics.day_of_week}</p>
-      <p>Recommendations: {analytics.recommendations}</p>
+      <DebugPanel />
     </div>
   );
 };

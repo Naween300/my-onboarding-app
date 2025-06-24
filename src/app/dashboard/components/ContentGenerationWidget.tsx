@@ -2,393 +2,214 @@
 
 import React, { useState, useEffect } from 'react';
 import { smeApi, ContentGenerationRequest, GeneratedContent } from '@/lib/sme-api';
+import { useSupabase } from '@/contexts/SupabaseContext';
+import { useUser } from '@clerk/nextjs';
 
-type ContentGenerationWidgetProps = {
-  userProfile?: any;
-};
+interface UserProfile {
+  name: string;
+  onboarding?: {
+    business_name: string;
+    business_type: string;
+    budget: number;
+    timeline: string;
+    brand_colors: any;
+    goals: string[];
+    brand_personality: string[];
+  };
+}
 
-// Helper function to safely render objects
-const safeRenderObject = (obj: any, fallback = 'No data available') => {
-  if (!obj) return fallback;
-  if (typeof obj === 'string' || typeof obj === 'number') return obj;
-  if (Array.isArray(obj)) return obj.join(', ');
-  if (typeof obj === 'object') {
-    return Object.entries(obj).map(([key, value]) => (
-      <div key={key} className="mb-1">
-        <span className="font-medium capitalize">{key.replace('_', ' ')}:</span> {String(value)}
-      </div>
-    ));
-  }
-  return String(obj);
-};
+interface ContentGenerationWidgetProps {
+  user: any;
+}
 
-// Comprehensive safety check for any content
-const safeRenderContent = (content: any, fieldName: string) => {
-  if (!content) return null;
-  
-  // If it's a string or number, render directly
-  if (typeof content === 'string' || typeof content === 'number') {
-    return String(content);
-  }
-  
-  // If it's an array, join with commas
-  if (Array.isArray(content)) {
-    return content.map(item => String(item)).join(', ');
-  }
-  
-  // If it's an object, log warning and return fallback
-  if (typeof content === 'object') {
-    console.warn(`⚠️ Attempted to render object directly for field: ${fieldName}`, content);
-    return `[${fieldName} data available]`;
-  }
-  
-  // Fallback
-  return String(content);
-};
-
-// Helper function to render analytics data
-const renderAnalytics = (analytics: any) => {
-  if (!analytics || typeof analytics !== 'object') {
-    return <p className="text-gray-500">No analytics available</p>;
-  }
-
-  return (
-    <div className="bg-gray-50 p-4 rounded-lg mt-4">
-      <h4 className="font-semibold text-gray-900 mb-3">Content Analytics</h4>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-        {analytics.optimal_time && (
-          <div>
-            <span className="text-sm font-medium text-gray-600">Best Time to Post:</span>
-            <p className="text-gray-900">{analytics.optimal_time}</p>
-          </div>
-        )}
-        {analytics.predicted_engagement && (
-          <div>
-            <span className="text-sm font-medium text-gray-600">Predicted Engagement:</span>
-            <p className="text-gray-900">{analytics.predicted_engagement}</p>
-          </div>
-        )}
-        {analytics.day_of_week && (
-          <div>
-            <span className="text-sm font-medium text-gray-600">Best Day:</span>
-            <p className="text-gray-900">{analytics.day_of_week}</p>
-          </div>
-        )}
-        {analytics.recommendations && (
-          <div className="md:col-span-2">
-            <span className="text-sm font-medium text-gray-600">Recommendations:</span>
-            <p className="text-gray-900">{analytics.recommendations}</p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-export const ContentGenerationWidget: React.FC<ContentGenerationWidgetProps> = ({ userProfile: userProfileProp }) => {
-  const [userProfile, setUserProfile] = useState<any>(userProfileProp || null);
+export default function ContentGenerationWidget({ user }: ContentGenerationWidgetProps) {
+  const supabase = useSupabase();
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [generatedContent, setGeneratedContent] = useState<GeneratedContent | null>(null);
-  const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [contentParams, setContentParams] = useState({
-    target_audience: 'general',
-    brand_voice: 'professional',
-    target_date: new Date().toISOString().split('T')[0]
-  });
 
-  // Load user profile from localStorage on component mount if not provided as prop
   useEffect(() => {
-    if (userProfileProp) return;
-    const loadUserProfile = () => {
+    const fetchUserProfile = async () => {
+      if (!user?.id) return;
+
       try {
-        const userCacheData = localStorage.getItem('userCacheData');
-        const brandName = localStorage.getItem('brandName');
-        if (userCacheData) {
-          const profile = JSON.parse(userCacheData);
-          setUserProfile({ ...profile, brandName });
-          console.log('👤 User profile loaded:', profile);
+        console.log('🔍 Fetching user profile for:', user.id);
+        
+        // ✅ Test authentication first (from search result [2])
+        const { data: testData, error: testError } = await supabase.rpc('test_authorization_header');
+        console.log('🔍 Auth test:', { role: testData?.role, userId: testData?.sub, error: testError });
+        
+        if (!testData || testData.role !== 'authenticated') {
+          console.error('❌ User not authenticated for database access');
+          setError('Authentication failed');
+          return;
         }
+
+        // ✅ Fetch user profile with proper error handling
+        const { data: profile, error: profileError } = await supabase
+          .from('user_profiles')
+          .select(`
+            *,
+            onboarding (
+              business_name,
+              business_type,
+              budget,
+              timeline,
+              brand_colors,
+              goals,
+              brand_personality
+            )
+          `)
+          .eq('clerk_user_id', user.id)
+          .single();
+
+        if (profileError) {
+          // ✅ Enhanced error handling for empty objects (from search result [4])
+          if (Object.keys(profileError).length === 0 || !profileError.message) {
+            console.error('❌ RLS Policy Violation: Access denied to user_profiles table');
+            setError('Database access denied - RLS policy issue');
+          } else {
+            console.error('❌ Profile fetch error:', profileError);
+            setError(profileError.message);
+          }
+          return;
+        }
+
+        if (!profile) {
+          console.error('❌ No profile found for user:', user.id);
+          setError('Profile not found');
+          return;
+        }
+
+        console.log('✅ User profile fetched successfully:', profile);
+        setUserProfile(profile);
+
       } catch (error) {
-        console.error('Failed to load user profile:', error);
-        setError('Failed to load user profile');
+        console.error('❌ Error fetching profile:', error);
+        setError('Failed to fetch profile');
       }
     };
-    loadUserProfile();
-  }, [userProfileProp]);
 
-  // Generate personalized content based on onboarding data
-  const generatePersonalizedContent = async () => {
-    if (!userProfile) {
-      setError('User profile not available');
-      return;
-    }
+    fetchUserProfile();
+  }, [user?.id, supabase]);
+
+  // ✅ Handle error states gracefully
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+        <h3 className="text-red-800 font-semibold">Profile Error</h3>
+        <p className="text-red-700">{error}</p>
+        <button 
+          onClick={() => window.location.reload()}
+          className="mt-2 bg-red-600 text-white px-3 py-1 rounded text-sm"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
+  // ✅ Show loading state
+  if (!userProfile) {
+    return (
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+        <div className="animate-pulse">Loading user profile...</div>
+      </div>
+    );
+  }
+
+  // ✅ Content generation function
+  const generateContent = async () => {
+    if (!userProfile) return;
 
     setIsGenerating(true);
     setError(null);
-    setGeneratedImage(null); // Reset image state
 
     try {
-      console.log('🎯 Generating content for profile:', userProfile);
-
       const contentRequest: ContentGenerationRequest = {
-        industry: userProfile.businessType || 'general',
-        business_type: userProfile.customerType || 'b2c',
-        target_audience: contentParams.target_audience,
-        brand_voice: contentParams.brand_voice,
-        target_date: contentParams.target_date
+        industry: userProfile.onboarding?.business_type || 'general',
+        business_type: 'b2c',
+        target_audience: 'general',
+        brand_voice: 'professional',
+        target_date: new Date().toISOString().split('T')[0]
       };
 
-      console.log('📝 Content request:', contentRequest);
       const content = await smeApi.generateContent(contentRequest);
+      setGeneratedContent(content);
       
-      // ✅ Handle the response properly - extract specific properties
-      if (content) {
-        setGeneratedContent(content);
-        
-        // Handle image URL if present
-        if (content.image_url) {
-          setGeneratedImage(content.image_url);
-        }
-        
-        console.log('✅ Content generated successfully:', {
-          caption: content.caption,
-          hashtags: content.hashtags,
-          imageUrl: content.image_url,
-          analytics: content.analytics ? 'Present' : 'Not present'
-        });
-      }
     } catch (error) {
       console.error('❌ Content generation failed:', error);
-      setError(error instanceof Error ? error.message : 'Failed to generate content');
+      setError('Failed to generate content');
     } finally {
       setIsGenerating(false);
     }
   };
 
+  // ✅ Render content generation widget with profile data
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900">AI Content Generator</h2>
-          <p className="text-sm text-gray-600">
-            Personalized content based on your business profile
-          </p>
-        </div>
-        <div className="flex items-center space-x-2">
-          <span className="text-sm text-gray-500">Powered by AI</span>
-          <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-        </div>
-      </div>
-
-      {/* User Profile Summary */}
-      {userProfile && (
-        <div className="mb-6 p-4 bg-blue-50 rounded-lg">
-          <h3 className="text-sm font-medium text-blue-900 mb-2">Your Business Profile</h3>
-          <div className="grid grid-cols-2 gap-4 text-sm text-blue-700">
-            <div>
-              <span className="font-medium">Business:</span> {userProfile.brandName || 'N/A'}
-            </div>
-            <div>
-              <span className="font-medium">Type:</span> {userProfile.businessType || 'N/A'}
-            </div>
-            <div>
-              <span className="font-medium">Customer:</span> {userProfile.customerType || 'N/A'}
-            </div>
-            <div>
-              <span className="font-medium">Budget:</span> ${userProfile.userBudget || 'N/A'}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Content Parameters */}
-      <div className="mb-6 space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Target Date
-            </label>
-            <input
-              type="date"
-              value={contentParams.target_date}
-              onChange={(e) => setContentParams(prev => ({
-                ...prev,
-                target_date: e.target.value
-              }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Brand Voice
-            </label>
-            <select
-              value={contentParams.brand_voice}
-              onChange={(e) => setContentParams(prev => ({
-                ...prev,
-                brand_voice: e.target.value
-              }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="professional">Professional</option>
-              <option value="friendly">Friendly</option>
-              <option value="casual">Casual</option>
-              <option value="authoritative">Authoritative</option>
-              <option value="playful">Playful</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Target Audience
-            </label>
-            <select
-              value={contentParams.target_audience}
-              onChange={(e) => setContentParams(prev => ({
-                ...prev,
-                target_audience: e.target.value
-              }))}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="general">General Audience</option>
-              <option value="young_adults">Young Adults (18-35)</option>
-              <option value="professionals">Professionals</option>
-              <option value="local_community">Local Community</option>
-              <option value="business_owners">Business Owners</option>
-            </select>
-          </div>
-        </div>
-      </div>
-
-      {/* Error Display */}
-      {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-red-600 text-sm">❌ {error}</p>
-        </div>
-      )}
-
+    <div className="bg-white rounded-lg shadow p-6">
+      <h2 className="text-xl font-semibold mb-4">AI Content Generation</h2>
+      <p>Welcome, {userProfile.name}!</p>
+      <p>Business: {userProfile.onboarding?.business_name}</p>
+      
       {/* Generate Button */}
       <button
-        onClick={generatePersonalizedContent}
-        disabled={isGenerating || !userProfile}
-        className={`w-full py-3 px-4 rounded-md font-medium transition-colors ${
-          isGenerating || !userProfile
-            ? 'bg-gray-400 text-gray-200 cursor-not-allowed'
+        onClick={generateContent}
+        disabled={isGenerating}
+        className={`w-full py-3 px-4 rounded-lg font-medium transition-colors ${
+          isGenerating
+            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
             : 'bg-blue-600 text-white hover:bg-blue-700'
         }`}
       >
         {isGenerating ? (
           <div className="flex items-center justify-center">
-            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-            Generating AI Content...
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+            Generating Content...
           </div>
         ) : (
-          '🎯 Generate AI Content for My Business'
+          '🤖 Generate AI Content for My Business'
         )}
       </button>
-
-      {/* Enhanced Loading State */}
-      {isGenerating && (
-        <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="flex items-center justify-center">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mr-3"></div>
-            <div>
-              <p className="text-blue-800 font-medium">Generating personalized content...</p>
-              <p className="text-blue-600 text-sm">This may take a few moments</p>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Generated Content Display */}
       {generatedContent && (
         <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-          <h4 className="font-medium text-green-900 mb-4 flex items-center">
-            <span className="mr-2">✨</span>
-            Generated Content for {userProfile?.brandName}
-          </h4>
-          
-          <div className="space-y-4">
-            {/* Display generated image if available */}
-            {generatedImage && (
-              <div>
-                <h5 className="text-sm font-medium text-green-800 mb-1">Generated Image:</h5>
-                <div className="bg-white p-3 rounded border">
-                  <img 
-                    src={generatedImage} 
-                    alt="Generated content" 
-                    className="max-w-full h-auto rounded-lg"
-                    onError={(e) => {
-                      console.error('Failed to load generated image');
-                      e.currentTarget.style.display = 'none';
-                    }}
-                  />
-                </div>
-              </div>
-            )}
-            
-            {generatedContent.caption && (
-              <div>
-                <h5 className="text-sm font-medium text-green-800 mb-1">Caption:</h5>
-                <p className="text-sm text-green-700 bg-white p-3 rounded border">
-                  {safeRenderContent(generatedContent.caption, 'caption')}
-                </p>
-              </div>
-            )}
-            
-            {generatedContent.hashtags && (
-              <div>
-                <h5 className="text-sm font-medium text-green-800 mb-1">Hashtags:</h5>
-                <p className="text-sm text-green-700 bg-white p-3 rounded border">
-                  {safeRenderContent(generatedContent.hashtags, 'hashtags')}
-                </p>
-              </div>
-            )}
-            
-            {generatedContent.posting_strategy && (
-              <div>
-                <h5 className="text-sm font-medium text-green-800 mb-1">Posting Strategy:</h5>
-                <p className="text-sm text-green-700 bg-white p-3 rounded border">
-                  {safeRenderContent(generatedContent.posting_strategy, 'posting_strategy')}
-                </p>
-              </div>
-            )}
-
-            {generatedContent.trending_insights && generatedContent.trending_insights.length > 0 && (
-              <div>
-                <h5 className="text-sm font-medium text-green-800 mb-1">Trending Insights:</h5>
-                <ul className="text-sm text-green-700 bg-white p-3 rounded border space-y-1">
-                  {generatedContent.trending_insights.map((insight, index) => (
-                    <li key={index}>• {safeRenderContent(insight, `insight ${index + 1}`)}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {/* Analytics Data - Safely rendered using helper function */}
-            {generatedContent.analytics && renderAnalytics(generatedContent.analytics)}
-          </div>
-          
-          <div className="mt-4 flex space-x-2">
-            <button className="px-4 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700">
-              📋 Copy Content
-            </button>
-            <button 
-              onClick={generatePersonalizedContent}
-              className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
-            >
-              🔄 Regenerate
-            </button>
-            <button className="px-4 py-2 bg-purple-600 text-white text-sm rounded hover:bg-purple-700">
-              📅 Schedule Post
-            </button>
-          </div>
+          <h4 className="text-lg font-semibold text-green-900 mb-2">Generated Content</h4>
+          {generatedContent.caption && (
+            <div className="mb-2">
+              <span className="font-medium">Caption:</span> {generatedContent.caption}
+            </div>
+          )}
+          {generatedContent.hashtags && (
+            <div className="mb-2">
+              <span className="font-medium">Hashtags:</span> {Array.isArray(generatedContent.hashtags) ? generatedContent.hashtags.join(', ') : generatedContent.hashtags}
+            </div>
+          )}
+          {generatedContent.posting_strategy && (
+            <div className="mb-2">
+              <span className="font-medium">Posting Strategy:</span> {generatedContent.posting_strategy}
+            </div>
+          )}
+          {generatedContent.trending_insights && Array.isArray(generatedContent.trending_insights) && generatedContent.trending_insights.length > 0 && (
+            <div className="mb-2">
+              <span className="font-medium">Trending Insights:</span>
+              <ul className="list-disc list-inside ml-4">
+                {generatedContent.trending_insights.map((insight, idx) => (
+                  <li key={idx}>{insight}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {generatedContent.analytics && (
+            <div className="mt-4">
+              <span className="font-medium">Analytics:</span>
+              <pre className="bg-white p-2 rounded border mt-1 text-xs overflow-x-auto">{JSON.stringify(generatedContent.analytics, null, 2)}</pre>
+            </div>
+          )}
         </div>
       )}
     </div>
   );
-};
-
-export default ContentGenerationWidget;
+}

@@ -4,40 +4,36 @@ import { useAuth } from '@clerk/nextjs'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 
-// ✅ Create a single instance
-let supabaseInstance: any = null;
+// Singleton instance
+let supabaseInstance: ReturnType<typeof createClient> | null = null;
 
 export function useSupabaseClient() {
   const { getToken } = useAuth()
   
-  const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-    global: {
-      fetch: async (url, options = {}) => {
-        try {
-          // ✅ Get the JWT token using the template we created
-          const clerkToken = await getToken({ template: 'supabase' })
+  // Only create the client once
+  if (!supabaseInstance) {
+    supabaseInstance = createClient(supabaseUrl, supabaseAnonKey, {
+      global: {
+        fetch: async (url, options = {}) => {
+          const clerkToken = await getToken({ template: 'supabase' });
           
-          const headers = new Headers(options?.headers)
+          const headers = new Headers(options?.headers);
           if (clerkToken) {
-            headers.set('Authorization', `Bearer ${clerkToken}`)
-            console.log('🔑 Using Clerk JWT token for Supabase authentication')
+            headers.set('Authorization', `Bearer ${clerkToken}`);
           } else {
-            console.warn('⚠️ No Clerk JWT token available - user may not be authenticated')
+            console.warn('⚠️ No JWT token available for request');
           }
           
           return fetch(url, {
             ...options,
             headers,
-          })
-        } catch (error) {
-          console.error('❌ Error getting Clerk token:', error)
-          return fetch(url, options)
-        }
+          });
+        },
       },
-    },
-  })
+    })
+  }
   
-  return supabase
+  return supabaseInstance;
 }
 
 // Server-side Supabase client

@@ -2,6 +2,7 @@ import './globals.css'
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { ClerkProvider } from '@clerk/nextjs'
+import { SupabaseProvider } from '@/contexts/SupabaseContext'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -40,11 +41,12 @@ export default function RootLayout({
       }}
     >
       <html lang="en" suppressHydrationWarning>
-        <head suppressHydrationWarning />
         <body className={inter.className} suppressHydrationWarning>
-          <div suppressHydrationWarning>
-            {children}
-          </div>
+          <SupabaseProvider>
+            <div suppressHydrationWarning>
+              {children}
+            </div>
+          </SupabaseProvider>
         </body>
       </html>
     </ClerkProvider>
