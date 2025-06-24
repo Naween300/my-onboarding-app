@@ -1,21 +1,37 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { smeApi, AnalyticsData } from '@/lib/sme-api';
+import { smeApi } from '@/lib/sme-api';
+
+// ✅ Proper TypeScript interfaces
+interface AnalyticsOverview {
+  total_posts: number;
+  avg_engagement: number;
+  date_range: {
+    start: string;
+    end: string;
+  };
+}
+
+interface AnalyticsResponse {
+  success: boolean;
+  analytics: {
+    overview: AnalyticsOverview;
+    generation_info: {
+      generated_at: string;
+    };
+  };
+}
 
 export const AnalyticsWidget: React.FC = () => {
-  const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
+  const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
-  // Load analytics data on component mount and set up auto-refresh
   useEffect(() => {
     loadAnalytics();
-    
-    // Set up auto-refresh every 5 minutes
     const interval = setInterval(loadAnalytics, 5 * 60 * 1000);
-    
     return () => clearInterval(interval);
   }, []);
 
@@ -24,13 +40,13 @@ export const AnalyticsWidget: React.FC = () => {
       console.log('📊 Loading analytics data...');
       setError(null);
       
-      const analytics = await smeApi.getAnalytics();
-      setAnalyticsData(analytics);
+      const analyticsData = await smeApi.getAnalytics();
+      setAnalytics(analyticsData as unknown as AnalyticsResponse);
       setLastUpdated(new Date());
-      console.log('✅ Analytics loaded successfully:', analytics);
-    } catch (error) {
+      console.log('✅ Analytics loaded successfully:', analyticsData);
+    } catch (error: any) {
       console.error('❌ Failed to load analytics:', error);
-      setError(error instanceof Error ? error.message : 'Failed to load analytics');
+      setError(error.message || 'Failed to load analytics data');
     } finally {
       setIsLoading(false);
     }
@@ -41,16 +57,33 @@ export const AnalyticsWidget: React.FC = () => {
     loadAnalytics();
   };
 
-  if (isLoading && !analyticsData) {
+  // ✅ Loading state
+  if (isLoading && !analytics) {
     return (
       <div className="bg-white rounded-lg shadow-lg p-6">
         <div className="animate-pulse">
-          <div className="h-6 bg-gray-200 rounded w-1/3 mb-4"></div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[1, 2, 3, 4].map(i => (
-              <div key={i} className="h-20 bg-gray-200 rounded"></div>
-            ))}
-          </div>
+          <div className="h-6 bg-gray-200 rounded mb-4"></div>
+          <div className="h-4 bg-gray-200 rounded mb-2"></div>
+          <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+        </div>
+      </div>
+    );
+  }
+
+  // ✅ No data state
+  if (!isLoading && !analytics && !error) {
+    return (
+      <div className="bg-white rounded-lg shadow-lg p-6">
+        <h3 className="text-xl font-semibold text-gray-900 mb-4">Analytics Overview</h3>
+        <div className="text-center py-8">
+          <div className="text-gray-400 text-4xl mb-4">📊</div>
+          <p className="text-gray-600">No analytics data available</p>
+          <button
+            onClick={refreshAnalytics}
+            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Load Analytics Data
+          </button>
         </div>
       </div>
     );
@@ -58,111 +91,76 @@ export const AnalyticsWidget: React.FC = () => {
 
   return (
     <div className="bg-white rounded-lg shadow-lg p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-xl font-semibold text-gray-900">Real-time Analytics</h2>
-          <p className="text-sm text-gray-600">
-            {lastUpdated && `Last updated: ${lastUpdated.toLocaleTimeString()}`}
-          </p>
-        </div>
-        <div className="flex items-center space-x-2">
-          <button
-            onClick={refreshAnalytics}
-            disabled={isLoading}
-            className="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700 disabled:opacity-50"
-          >
-            {isLoading ? '🔄' : '↻'} Refresh
-          </button>
-          <div className={`w-2 h-2 rounded-full ${error ? 'bg-red-400' : 'bg-green-400'} animate-pulse`}></div>
-        </div>
+      {/* ✅ Header with refresh button */}
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-xl font-semibold text-gray-900">Analytics Overview</h3>
+        <button
+          onClick={refreshAnalytics}
+          disabled={isLoading}
+          className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 disabled:opacity-50 transition-colors flex items-center gap-1"
+        >
+          <span className={isLoading ? 'animate-spin' : ''}>{isLoading ? '↻' : '🔄'}</span>
+          Refresh
+        </button>
       </div>
-
+      
+      {/* ✅ Enhanced error handling */}
       {error && (
-        <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
-          <p className="text-red-600 text-sm">❌ {error}</p>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-red-700 text-sm font-medium">Failed to load analytics</p>
+              <p className="text-red-600 text-xs mt-1">{error}</p>
+            </div>
+            <button
+              onClick={refreshAnalytics}
+              disabled={isLoading}
+              className="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700 disabled:opacity-50"
+            >
+              Retry
+            </button>
+          </div>
         </div>
       )}
 
-      {analyticsData ? (
-        <div className="space-y-6">
-          {/* Performance Metrics */}
-          {analyticsData.performance && (
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Performance Metrics</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="text-center p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <div className="text-2xl font-bold text-blue-600">
-                    {analyticsData.performance.likes?.toLocaleString() || 0}
-                  </div>
-                  <div className="text-sm text-blue-600 font-medium">Likes</div>
-                  <div className="text-xs text-blue-500 mt-1">👍 Engagement</div>
-                </div>
-                
-                <div className="text-center p-4 bg-green-50 rounded-lg border border-green-200">
-                  <div className="text-2xl font-bold text-green-600">
-                    {analyticsData.performance.comments?.toLocaleString() || 0}
-                  </div>
-                  <div className="text-sm text-green-600 font-medium">Comments</div>
-                  <div className="text-xs text-green-500 mt-1">💬 Interaction</div>
-                </div>
-                
-                <div className="text-center p-4 bg-purple-50 rounded-lg border border-purple-200">
-                  <div className="text-2xl font-bold text-purple-600">
-                    {analyticsData.performance.shares?.toLocaleString() || 0}
-                  </div>
-                  <div className="text-sm text-purple-600 font-medium">Shares</div>
-                  <div className="text-xs text-purple-500 mt-1">🔄 Reach</div>
-                </div>
-                
-                <div className="text-center p-4 bg-orange-50 rounded-lg border border-orange-200">
-                  <div className="text-2xl font-bold text-orange-600">
-                    {analyticsData.performance.engagement_rate?.toFixed(1) || 0}%
-                  </div>
-                  <div className="text-sm text-orange-600 font-medium">Engagement</div>
-                  <div className="text-xs text-orange-500 mt-1">📈 Rate</div>
-                </div>
+      {analytics && (
+        <div className="space-y-4">
+          {/* Overview Stats */}
+          <div className="grid grid-cols-1 gap-4">
+            <div className="text-center p-4 bg-blue-50 rounded">
+              <div className="text-2xl font-bold text-blue-600">
+                {analytics.analytics.overview.total_posts?.toLocaleString() ?? '—'}
               </div>
+              <div className="text-sm text-blue-800">Total Posts Analyzed</div>
             </div>
-          )}
+            
+            <div className="text-center p-4 bg-green-50 rounded">
+              <div className="text-2xl font-bold text-green-600">
+                {analytics.analytics.overview.avg_engagement?.toFixed(1) ?? '—'}
+              </div>
+              <div className="text-sm text-green-800">Average Engagement</div>
+            </div>
+          </div>
 
-          {/* Key Insights */}
-          {analyticsData.insights && analyticsData.insights.length > 0 && (
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Key Insights</h3>
-              <div className="space-y-3">
-                {analyticsData.insights.slice(0, 5).map((insight, index) => (
-                  <div key={index} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                    <p className="text-sm text-gray-700">💡 {insight}</p>
-                  </div>
-                ))}
-              </div>
+          {/* Date Range */}
+          <div className="text-center p-3 bg-gray-50 rounded">
+            <div className="text-sm text-gray-600">
+              Data Range: {analytics.analytics.overview.date_range?.start ? new Date(analytics.analytics.overview.date_range.start).toLocaleDateString() : '—'} - 
+              {analytics.analytics.overview.date_range?.end ? new Date(analytics.analytics.overview.date_range.end).toLocaleDateString() : '—'}
             </div>
-          )}
+          </div>
 
-          {/* Recommendations */}
-          {analyticsData.recommendations && analyticsData.recommendations.length > 0 && (
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-4">AI Recommendations</h3>
-              <div className="space-y-3">
-                {analyticsData.recommendations.slice(0, 3).map((recommendation, index) => (
-                  <div key={index} className="p-3 bg-blue-50 rounded-lg border border-blue-200">
-                    <p className="text-sm text-blue-700">🎯 {recommendation}</p>
-                  </div>
-                ))}
-              </div>
+          {/* Generation Info */}
+          <div className="text-xs text-gray-500 text-center">
+            Generated: {analytics.analytics.generation_info?.generated_at ? new Date(analytics.analytics.generation_info.generated_at).toLocaleString() : '—'}
+          </div>
+
+          {/* ✅ Last Updated Time */}
+          {lastUpdated && (
+            <div className="text-xs text-gray-500 text-center border-t pt-2">
+              Last updated: {lastUpdated.toLocaleString()}
             </div>
           )}
-        </div>
-      ) : (
-        <div className="text-center py-8">
-          <div className="text-gray-400 text-4xl mb-4">📊</div>
-          <p className="text-gray-500">No analytics data available</p>
-          <button
-            onClick={refreshAnalytics}
-            className="mt-4 px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
-          >
-            Load Analytics
-          </button>
         </div>
       )}
     </div>

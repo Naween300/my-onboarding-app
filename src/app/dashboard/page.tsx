@@ -14,6 +14,7 @@ import ClientOnly from '@/components/ClientOnly';
 import SafeRender from '@/components/SafeRender';
 import dynamic from 'next/dynamic';
 import { AuthTest } from '@/components/AuthTest';
+import { PerformanceWidget } from './components/PerformanceWidget';
 
 const DashboardContent = dynamic(() => import('./components/DashboardContent'), { 
   ssr: false,
@@ -199,22 +200,22 @@ export default function DashboardPage() {
           </div>
         </div>
       }>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Industry News Feed - moved to top */}
-          <div className="lg:col-span-2">
-            <RSSFeedWidget userBusinessType={onboardingData?.businessType} hideIndustrySelector={true} />
+        <div className="flex flex-col gap-6 w-full px-2 md:px-6">
+          <div className="flex flex-col md:flex-row gap-6 w-full">
+            <div className="flex-1">
+              <RSSFeedWidget />
+            </div>
+            <div className="flex-1">
+              <TrendingInsightsWidget />
+            </div>
           </div>
-          {/* Trending Insights */}
-          <div className="lg:col-span-1">
-            <TrendingInsightsWidget />
-          </div>
-          {/* AI Content Generator - moved down */}
-          <div className="lg:col-span-1">
-            <ContentGenerationWidget user={user} />
-          </div>
-          {/* Analytics Widget */}
-          <div className="lg:col-span-1">
-            <AnalyticsWidget />
+          <div className="flex flex-col md:flex-row gap-6 w-full">
+            <div className="flex-1">
+              <AnalyticsWidget />
+            </div>
+            <div className="flex-1">
+              <PerformanceWidget />
+            </div>
           </div>
         </div>
       </ClientOnly>
