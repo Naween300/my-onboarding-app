@@ -3,6 +3,10 @@
 import dynamic from 'next/dynamic';
 import { useState, useEffect } from 'react';
 import { useUser } from '@clerk/nextjs';
+import { DashboardLayout } from '@/components/DashboardLayout';
+// At the top of your dashboard page, verify this line exists:
+
+
 
 // ✅ Dynamic import to prevent SSR issues
 const OnboardingFlow = dynamic(() => import('./components/OnboardingFlow').then(mod => ({ default: mod.OnboardingFlow })), {

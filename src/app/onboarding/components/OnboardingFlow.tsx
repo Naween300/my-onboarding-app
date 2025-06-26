@@ -5,13 +5,14 @@ import { useUser } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { DropResult } from '@hello-pangea/dnd';
 import { useOnboarding } from '@/hooks/useOnboarding';
-import { useSupabaseClient } from '@/lib/supabase-client';
+import { useSupabase } from '@/contexts/SupabaseContext';
+import { StrategyService } from '@/lib/strategies/strategy-service';
 
 export const OnboardingFlow = () => {
   const { user, isLoaded } = useUser();
   const router = useRouter();
   const { data, saveCompleteData, updateData, error: hookError } = useOnboarding();
-  const supabase = useSupabaseClient();
+  const supabase = useSupabase();
   const [currentStep, setCurrentStep] = useState(1);
   const [formData, setFormData] = useState({
     businessType: '',
@@ -274,6 +275,14 @@ export const OnboardingFlow = () => {
       }
 
       console.log('✅ Database save successful');
+
+      // ✅ Use authenticated Supabase client
+      const strategyService = new StrategyService(supabase);
+      
+      console.log('🎯 Starting strategy assignment...');
+      await strategyService.assignStrategyToUser(user.id);
+      
+      console.log('✅ Strategy assigned successfully');
 
       // ✅ DON'T update Clerk metadata - causes cookie size issues
       // await user.update({ unsafeMetadata: { onboardingComplete: true } });

@@ -30,50 +30,52 @@ export default clerkMiddleware(async (auth, request) => {
     return (await auth()).redirectToSignIn()
   }
 
-  // ✅ CRITICAL: Check onboarding status from database instead of session claims
-  if (userId && !isOnboardingRoute(request)) {
-    try {
-      const supabase = createClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY! // Use service role for middleware
-      );
-      
-      const { data: onboardingData } = await supabase
-        .from('onboarding')
-        .select('clerk_user_id')
-        .eq('clerk_user_id', userId)
-        .single();
-      
-      if (!onboardingData) {
-        console.log('🔄 Redirecting to onboarding - not found in database');
-        return Response.redirect(new URL('/onboarding', request.url));
-      }
-    } catch (error) {
-      console.error('❌ Database check failed:', error);
-      // On error, allow access to prevent blocking
-    }
+  // ✅ CRITICAL: Add environment variable check before database operations
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error('❌ SUPABASE_SERVICE_ROLE_KEY is missing! Database checks will be skipped');
+    // Allow access but log warning
+    return;
   }
-  
-  // ✅ If user is on onboarding page but already completed (database check)
-  if (userId && isOnboardingRoute(request)) {
+
+  // ✅ Enhanced database check with error handling
+  const performDatabaseCheck = async () => {
     try {
       const supabase = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY!
       );
       
-      const { data: onboardingData } = await supabase
+      const { data: onboardingData, error } = await supabase
         .from('onboarding')
         .select('clerk_user_id')
         .eq('clerk_user_id', userId)
         .single();
       
-      if (onboardingData) {
-        console.log('🚀 Onboarding complete in database, redirecting to dashboard');
-        return Response.redirect(new URL('/dashboard', request.url));
-      }
+      if (error) throw error;
+      return onboardingData;
     } catch (error) {
       console.error('❌ Database check failed:', error);
+      return null;
+    }
+  };
+
+  // ✅ Check onboarding status from database instead of session claims
+  if (userId && !isOnboardingRoute(request)) {
+    const onboardingData = await performDatabaseCheck();
+    
+    if (!onboardingData) {
+      console.log('🔄 Redirecting to onboarding - not found in database');
+      return Response.redirect(new URL('/onboarding', request.url));
+    }
+  }
+  
+  // ✅ If user is on onboarding page but already completed (database check)
+  if (userId && isOnboardingRoute(request)) {
+    const onboardingData = await performDatabaseCheck();
+    
+    if (onboardingData) {
+      console.log('🚀 Onboarding complete in database, redirecting to dashboard');
+      return Response.redirect(new URL('/dashboard', request.url));
     }
   }
 

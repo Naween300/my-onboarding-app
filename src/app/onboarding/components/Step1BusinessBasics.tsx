@@ -281,3 +281,4 @@ export const Step1BusinessBasics = ({ data, onNext }: Step1Props) => {
     </form>
   );
 };
+ 

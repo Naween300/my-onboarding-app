@@ -236,3 +236,4 @@ export const Step2GoalsStyle = ({ data, onNext, onBack }: Step2Props) => {
     </form>
   );
 };
+ 

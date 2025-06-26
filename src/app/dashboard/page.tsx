@@ -15,6 +15,9 @@ import SafeRender from '@/components/SafeRender';
 import dynamic from 'next/dynamic';
 import { AuthTest } from '@/components/AuthTest';
 import { PerformanceWidget } from './components/PerformanceWidget';
+import { StrategyWidget } from './components/StrategyWidget';
+import { DashboardLayout } from '@/components/DashboardLayout';
+import { SimpleSidebar } from '@/components/SimpleSidebar';
 
 const DashboardContent = dynamic(() => import('./components/DashboardContent'), { 
   ssr: false,
@@ -37,6 +40,7 @@ export default function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isClient, setIsClient] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const searchParams = useSearchParams();
 
   useEffect(() => {
@@ -188,37 +192,49 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="p-6" suppressHydrationWarning>
-      {/* Temporary test */}
-      <AuthTest />
-      {/* Your existing content */}
-      <ClientOnly fallback={
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center" suppressHydrationWarning>
-          <div className="text-center" suppressHydrationWarning>
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" suppressHydrationWarning></div>
-            <p className="text-gray-600">Loading dashboard...</p>
-          </div>
+    <>
+      <SimpleSidebar onToggle={setSidebarCollapsed} />
+      <div className={`transition-all duration-300 ${
+        sidebarCollapsed ? 'ml-16' : 'ml-64'
+      }`}>
+        <div className="p-6">
+          <AuthTest />
+          <ClientOnly fallback={
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center" suppressHydrationWarning>
+              <div className="text-center" suppressHydrationWarning>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4" suppressHydrationWarning></div>
+                <p className="text-gray-600">Loading dashboard...</p>
+              </div>
+            </div>
+          }>
+            <div className={`grid gap-6 transition-all duration-300 ${
+              sidebarCollapsed 
+                ? 'grid-cols-1 xl:grid-cols-4' 
+                : 'grid-cols-1 lg:grid-cols-3'
+            }`}>
+              <div className={`transition-all duration-300 ${
+                sidebarCollapsed ? 'xl:col-span-2' : 'lg:col-span-2'
+              }`}>
+                <RSSFeedWidget userBusinessType={onboardingData?.businessType} />
+              </div>
+              <div className="lg:col-span-1 xl:col-span-1">
+                <TrendingInsightsWidget />
+              </div>
+              <div className="lg:col-span-1 xl:col-span-1">
+                <StrategyWidget />
+              </div>
+              <div className={`grid gap-6 transition-all duration-300 ${
+                sidebarCollapsed 
+                  ? 'xl:col-span-3 grid-cols-1 md:grid-cols-3' 
+                  : 'lg:col-span-2 grid-cols-1 md:grid-cols-2'
+              }`}>
+                <AnalyticsWidget />
+                <PerformanceWidget />
+              </div>
+            </div>
+          </ClientOnly>
         </div>
-      }>
-        <div className="flex flex-col gap-6 w-full px-2 md:px-6">
-          <div className="flex flex-col md:flex-row gap-6 w-full">
-            <div className="flex-1">
-              <RSSFeedWidget />
-            </div>
-            <div className="flex-1">
-              <TrendingInsightsWidget />
-            </div>
-          </div>
-          <div className="flex flex-col md:flex-row gap-6 w-full">
-            <div className="flex-1">
-              <AnalyticsWidget />
-            </div>
-            <div className="flex-1">
-              <PerformanceWidget />
-            </div>
-          </div>
-        </div>
-      </ClientOnly>
-    </div>
+      </div>
+    </>
   );
 }

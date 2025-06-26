@@ -63,7 +63,7 @@ export default function ContentGenerationWidget({ user }: ContentGenerationWidge
           `)
           .eq('clerk_user_id', user.id)
           .single();
-
+        
         if (profileError) {
           // ✅ Enhanced error handling for empty objects (from search result [4])
           if (Object.keys(profileError).length === 0 || !profileError.message) {
@@ -111,7 +111,7 @@ export default function ContentGenerationWidget({ user }: ContentGenerationWidge
   }
 
   // ✅ Show loading state
-  if (!userProfile) {
+    if (!userProfile) {
     return (
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <div className="animate-pulse">Loading user profile...</div>
@@ -152,7 +152,7 @@ export default function ContentGenerationWidget({ user }: ContentGenerationWidge
       <h2 className="text-xl font-semibold mb-4">AI Content Generation</h2>
       <p>Welcome, {userProfile.name}!</p>
       <p>Business: {userProfile.onboarding?.business_name}</p>
-      
+
       {/* Generate Button */}
       <button
         onClick={generateContent}
@@ -177,36 +177,36 @@ export default function ContentGenerationWidget({ user }: ContentGenerationWidge
       {generatedContent && (
         <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
           <h4 className="text-lg font-semibold text-green-900 mb-2">Generated Content</h4>
-          {generatedContent.caption && (
+            {generatedContent.caption && (
             <div className="mb-2">
               <span className="font-medium">Caption:</span> {generatedContent.caption}
-            </div>
-          )}
-          {generatedContent.hashtags && (
+              </div>
+            )}
+            {generatedContent.hashtags && (
             <div className="mb-2">
               <span className="font-medium">Hashtags:</span> {Array.isArray(generatedContent.hashtags) ? generatedContent.hashtags.join(', ') : generatedContent.hashtags}
-            </div>
-          )}
-          {generatedContent.posting_strategy && (
+              </div>
+            )}
+            {generatedContent.posting_strategy && (
             <div className="mb-2">
               <span className="font-medium">Posting Strategy:</span> {generatedContent.posting_strategy}
-            </div>
-          )}
+              </div>
+            )}
           {generatedContent.trending_insights && Array.isArray(generatedContent.trending_insights) && generatedContent.trending_insights.length > 0 && (
             <div className="mb-2">
               <span className="font-medium">Trending Insights:</span>
               <ul className="list-disc list-inside ml-4">
                 {generatedContent.trending_insights.map((insight, idx) => (
                   <li key={idx}>{insight}</li>
-                ))}
-              </ul>
-            </div>
-          )}
+                  ))}
+                </ul>
+              </div>
+            )}
           {generatedContent.analytics && (
             <div className="mt-4">
               <span className="font-medium">Analytics:</span>
               <pre className="bg-white p-2 rounded border mt-1 text-xs overflow-x-auto">{JSON.stringify(generatedContent.analytics, null, 2)}</pre>
-            </div>
+          </div>
           )}
         </div>
       )}
