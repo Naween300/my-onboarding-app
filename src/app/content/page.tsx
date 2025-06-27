@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { SimpleSidebar } from '@/components/SimpleSidebar';
 import { FacebookPostModal } from '@/components/FacebookPostModal';
 
@@ -12,6 +12,7 @@ export default function ContentPage() {
   const [selectedContentType, setSelectedContentType] = useState('promotional');
   const [showFacebookModal, setShowFacebookModal] = useState(false);
   const [canvasImageData, setCanvasImageData] = useState<string>('');
+  const postPreviewRef = useRef<HTMLDivElement>(null);
 
   const templates = [
     { id: 'social-post', name: 'Social Media Post', icon: '📱' },
@@ -32,13 +33,56 @@ export default function ContentPage() {
     '#important', '#business', '#marketing', '#growth', '#innovation', '#success'
   ];
 
-  const handlePostNow = () => {
-    const canvas = document.getElementById('facebook-post-canvas') as HTMLCanvasElement;
-    if (canvas) {
-      const imageData = canvas.toDataURL('image/png');
-      setCanvasImageData(imageData);
+  const capturePostAsImage = async () => {
+    if (!postPreviewRef.current) {
+      console.error('❌ Post preview ref not found');
+      return '';
     }
+    try {
+      console.log('📸 Starting image capture...');
+      const html2canvas = (await import('html2canvas')).default;
+      const canvas = await html2canvas(postPreviewRef.current, {
+        background: '#ffffff',
+        useCORS: true,
+        allowTaint: true,
+        width: 500,
+        height: 600,
+        logging: true
+      });
+      const dataURL = canvas.toDataURL('image/png', 0.9);
+      console.log('✅ Image captured successfully:', {
+        width: canvas.width,
+        height: canvas.height,
+        dataSize: dataURL.length
+      });
+      return dataURL;
+    } catch (error) {
+      console.error('❌ Error capturing post image:', error);
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = 500;
+      canvas.height = 400;
+      if (ctx) {
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#000000';
+        ctx.font = '16px Arial';
+        ctx.fillText('Fresh Orange Juice Post', 50, 50);
+        ctx.fillText(postContent.substring(0, 50) + '...', 50, 100);
+      }
+      return canvas.toDataURL('image/png', 0.9);
+    }
+  };
+
+  const handlePostNow = async () => {
+    console.log('🚀 Post Now clicked - starting image capture...');
     setShowFacebookModal(true);
+    setCanvasImageData('');
+    setTimeout(async () => {
+      const imageData = await capturePostAsImage();
+      console.log('📸 Image capture result:', !!imageData ? 'Success' : 'Failed');
+      setCanvasImageData(imageData);
+    }, 100);
   };
 
   return (
@@ -179,13 +223,8 @@ export default function ContentPage() {
 
           <div className="flex-1 p-8 overflow-auto bg-gray-100">
             <div className="flex items-center justify-center min-h-full">
-              <canvas 
-                id="facebook-post-canvas"
-                className="hidden"
-                width="500"
-                height="762"
-              />
               <div 
+                ref={postPreviewRef}
                 className="bg-white rounded-lg shadow-xl overflow-hidden" 
                 style={{ 
                   width: '500px',
@@ -378,7 +417,10 @@ export default function ContentPage() {
       </div>
       <FacebookPostModal
         isOpen={showFacebookModal}
-        onClose={() => setShowFacebookModal(false)}
+        onClose={() => {
+          setShowFacebookModal(false);
+          setCanvasImageData('');
+        }}
         postContent={postContent}
         postImage={canvasImageData}
       />

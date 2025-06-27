@@ -25,43 +25,94 @@ export const FacebookPostModal = ({ isOpen, onClose, postContent, postImage }: F
   const [isPosting, setIsPosting] = useState(false);
   const [postStatus, setPostStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
+  const [isLoadingConnections, setIsLoadingConnections] = useState(true);
 
+  // ✅ Check for existing connections when modal opens
   useEffect(() => {
-    if (typeof window !== 'undefined' && !window.FB) {
-      loadFacebookSDK();
+    if (isOpen && user?.id) {
+      checkExistingConnections();
     }
-  }, []);
+  }, [isOpen, user?.id]);
+
+  const checkExistingConnections = async () => {
+    try {
+      setIsLoadingConnections(true);
+      console.log('🔍 Checking for existing Facebook connections...');
+      console.log('👤 Current user ID:', user?.id);
+
+      // ✅ Use API route for consistent data access
+      const response = await fetch('/api/facebook-connections', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-ID': user?.id || '', // Pass user ID in header
+        },
+      });
+
+      if (!response.ok) {
+        console.error('❌ Failed to fetch connections:', response.status);
+        setIsLoadingConnections(false);
+        return;
+      }
+
+      const { data: savedConnections } = await response.json();
+
+      console.log('🔍 Raw connections from API:', savedConnections);
+
+      if (savedConnections && savedConnections.length > 0) {
+        console.log('✅ Found existing connections:', savedConnections);
+        
+        // ✅ Convert saved connections to the format Facebook SDK expects
+        const formattedPages = savedConnections.map((conn: any) => ({
+          id: conn.page_id,
+          name: conn.page_name,
+          access_token: 'stored_token', // We'll handle token refresh later
+        }));
+
+        setConnectedPages(formattedPages);
+        setSelectedPage(formattedPages[0]);
+        setIsConnected(true);
+        console.log('🎉 Using existing Facebook connection');
+      } else {
+        console.log('📝 No existing connections found, user needs to connect');
+        setIsConnected(false);
+      }
+    } catch (error) {
+      console.error('❌ Error checking connections:', error);
+      setIsConnected(false);
+    } finally {
+      setIsLoadingConnections(false);
+    }
+  };
 
   const loadFacebookSDK = () => {
-    const script = document.createElement('script');
-    script.src = 'https://connect.facebook.net/en_US/sdk.js';
-    script.async = true;
-    script.defer = true;
-    script.crossOrigin = 'anonymous';
-    
-    script.onload = () => {
-      window.FB.init({
-        appId: process.env.NEXT_PUBLIC_FACEBOOK_APP_ID,
-        cookie: true,
-        xfbml: true,
-        version: 'v18.0'
-      });
-      
-      console.log('✅ Facebook SDK loaded successfully');
-    };
-    
-    document.head.appendChild(script);
+    if (typeof window !== 'undefined' && !window.FB) {
+      const script = document.createElement('script');
+      script.src = 'https://connect.facebook.net/en_US/sdk.js';
+      script.async = true;
+      script.defer = true;
+      script.crossOrigin = 'anonymous';
+      script.onload = () => {
+        window.FB.init({
+          appId: process.env.NEXT_PUBLIC_FACEBOOK_APP_ID,
+          cookie: true,
+          xfbml: true,
+          version: 'v18.0'
+        });
+        console.log('✅ Facebook SDK loaded successfully');
+      };
+      document.head.appendChild(script);
+    }
   };
 
   const handleFacebookLogin = () => {
     if (!window.FB) {
-      setErrorMessage('Facebook SDK not loaded. Please refresh and try again.');
+      loadFacebookSDK();
+      setTimeout(handleFacebookLogin, 1000); // Retry after SDK loads
       return;
     }
-
     window.FB.login((response: any) => {
       console.log('Facebook login response:', response);
-      
       if (response.status === 'connected') {
         setIsConnected(true);
         fetchUserPages(response.authResponse.accessToken);
@@ -79,18 +130,67 @@ export const FacebookPostModal = ({ isOpen, onClose, postContent, postImage }: F
         `https://graph.facebook.com/me/accounts?access_token=${accessToken}`
       );
       const data = await response.json();
-      
       console.log('Pages data:', data);
-      
       if (data.data && data.data.length > 0) {
         setConnectedPages(data.data);
         setSelectedPage(data.data[0]);
+        // ✅ Save new connections to database
+        await saveNewConnectionsToDatabase(data.data);
       } else {
         setErrorMessage('No Facebook pages found. Please make sure you have a Facebook page.');
       }
     } catch (error) {
       console.error('Error fetching pages:', error);
       setErrorMessage('Failed to fetch Facebook pages.');
+    }
+  };
+
+  const saveNewConnectionsToDatabase = async (pages: any[]) => {
+    try {
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+      for (const page of pages) {
+        const connectionData = {
+          clerk_user_id: user?.id,
+          page_id: page.id,
+          page_name: page.name,
+          connected_at: new Date().toISOString(),
+          is_active: true
+        };
+        await supabase
+          .from('facebook_connections')
+          .upsert(connectionData, {
+            onConflict: 'clerk_user_id,page_id',
+            ignoreDuplicates: false
+          });
+      }
+      console.log('✅ New connections saved to database');
+    } catch (error) {
+      console.error('❌ Error saving new connections:', error);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    try {
+      console.log('🔌 Disconnecting Facebook...');
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+      await supabase
+        .from('facebook_connections')
+        .update({ is_active: false })
+        .eq('clerk_user_id', user?.id);
+      setIsConnected(false);
+      setConnectedPages([]);
+      setSelectedPage(null);
+      console.log('✅ Facebook disconnected successfully');
+    } catch (error) {
+      console.error('❌ Error disconnecting:', error);
     }
   };
 
@@ -139,31 +239,74 @@ export const FacebookPostModal = ({ isOpen, onClose, postContent, postImage }: F
   const postImageToFacebook = async () => {
     if (!postImage || !selectedPage) return;
 
-    const blob = dataURItoBlob(postImage);
+    console.log('📤 Processing image for Facebook upload...');
     
-    const formData = new FormData();
-    formData.append('message', postContent);
-    formData.append('source', blob, 'post-image.jpg');
-    formData.append('access_token', selectedPage.access_token);
-
-    console.log('📤 Uploading image to Facebook...');
-
-    const response = await fetch(
-      `https://graph.facebook.com/${selectedPage.id}/photos`,
-      {
-        method: 'POST',
-        body: formData
-      }
-    );
-
-    const result = await response.json();
+    // ✅ Enhanced image processing for Facebook requirements
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    const img = new Image();
     
-    if (!response.ok) {
-      throw new Error(result.error?.message || 'Failed to upload image');
-    }
+    return new Promise((resolve, reject) => {
+      img.onload = async () => {
+        if (!ctx) {
+          reject(new Error('Failed to get canvas context'));
+          return;
+        }
 
-    console.log('✅ Image uploaded successfully:', result);
-    return result;
+        // ✅ Set minimum dimensions for Facebook
+        const minWidth = 600;  // Facebook minimum width
+        const minHeight = 315; // Facebook minimum height
+        
+        canvas.width = Math.max(img.width, minWidth);
+        canvas.height = Math.max(img.height, minHeight);
+        
+        // Draw image with white background
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        
+        // ✅ Convert to high-quality JPEG (Facebook prefers JPEG)
+        const highQualityDataURL = canvas.toDataURL('image/jpeg', 0.9);
+        const blob = dataURItoBlob(highQualityDataURL);
+        
+        // ✅ Check file size (Facebook minimum is usually around 15KB)
+        console.log('📊 Image size:', blob.size, 'bytes');
+        
+        if (blob.size < 15000) { // Less than 15KB
+          console.warn('⚠️ Image might be too small for Facebook');
+        }
+        
+        const formData = new FormData();
+        formData.append('message', postContent);
+        formData.append('source', blob, 'facebook-post.jpg');
+        formData.append('access_token', selectedPage.access_token);
+
+        try {
+          const response = await fetch(
+            `https://graph.facebook.com/${selectedPage.id}/photos`,
+            {
+              method: 'POST',
+              body: formData
+            }
+          );
+
+          const result = await response.json();
+          
+          if (!response.ok) {
+            console.error('❌ Facebook API Error:', result);
+            throw new Error(result.error?.message || 'Failed to upload image');
+          }
+
+          console.log('✅ Image uploaded successfully:', result);
+          resolve(result);
+        } catch (error) {
+          reject(error);
+        }
+      };
+      
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = postImage;
+    });
   };
 
   const postTextToFacebook = async () => {
@@ -191,20 +334,68 @@ export const FacebookPostModal = ({ isOpen, onClose, postContent, postImage }: F
 
   const saveConnectionToSupabase = async () => {
     try {
+      console.log('💾 Saving Facebook connection to Supabase...');
+      
+      if (!user?.id || !selectedPage) {
+        console.error('❌ Missing user ID or selected page');
+        return;
+      }
+
+      // ✅ Call API route instead of direct Supabase
+      const response = await fetch('/api/facebook-connections', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          clerk_user_id: user.id,
+          page_id: selectedPage.id,
+          page_name: selectedPage.name,
+        }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok) {
+        throw new Error(result.error || 'Failed to save connection');
+      }
+
+      console.log('✅ Facebook connection saved successfully:', result.data);
+      return result.data;
+
+    } catch (error) {
+      console.error('❌ Error saving connection to Supabase:', error);
+      setErrorMessage(`Failed to save connection: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw error;
+    }
+  };
+
+  // Quick Debug Test: Service role insert
+  const testDirectInsert = async () => {
+    try {
       const { createClient } = await import('@supabase/supabase-js');
-      const supabase = createClient(
+      // Test with service role (should work)
+      const supabaseService = createClient(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        process.env.NEXT_PUBLIC_SUPABASE_SERVICE_ROLE_KEY!
       );
 
-      await supabase.from('facebook_connections').upsert({
+      const testData = {
         clerk_user_id: user?.id,
-        page_id: selectedPage.id,
-        page_name: selectedPage.name,
-        connected_at: new Date().toISOString()
-      });
+        page_id: 'test_123',
+        page_name: 'Test Page',
+        connected_at: new Date().toISOString(),
+        is_active: true
+      };
+
+      const { data, error } = await supabaseService
+        .from('facebook_connections')
+        .insert(testData)
+        .select();
+
+      console.log('🧪 Service role test:', { data, error });
     } catch (error) {
-      console.error('Error saving connection:', error);
+      console.error('🧪 Test failed:', error);
     }
   };
 
@@ -221,7 +412,12 @@ export const FacebookPostModal = ({ isOpen, onClose, postContent, postImage }: F
 
         {/* Modal Content */}
         <div className="p-6">
-          {!isConnected ? (
+          {isLoadingConnections ? (
+            <div className="text-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+              <p className="text-gray-600">Checking Facebook connections...</p>
+            </div>
+          ) : !isConnected ? (
             <div className="text-center">
               <div className="mb-4">
                 <div className="w-16 h-16 bg-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -242,6 +438,21 @@ export const FacebookPostModal = ({ isOpen, onClose, postContent, postImage }: F
             </div>
           ) : (
             <div>
+              {/* Connection Status */}
+              <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-2">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <span className="text-green-800 text-sm font-medium">Facebook Connected</span>
+                  </div>
+                  <button
+                    onClick={handleDisconnect}
+                    className="text-green-600 hover:text-green-800 text-sm"
+                  >
+                    Disconnect
+                  </button>
+                </div>
+              </div>
               {/* Page Selection */}
               <div className="mb-6">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Select Facebook Page</label>
@@ -264,9 +475,22 @@ export const FacebookPostModal = ({ isOpen, onClose, postContent, postImage }: F
                 <label className="block text-sm font-medium text-gray-700 mb-2">Post Preview</label>
                 <div className="border border-gray-200 rounded-lg p-3 bg-gray-50">
                   <p className="text-sm text-gray-800">{postContent}</p>
-                  {postImage && (
+                  {postImage ? (
                     <div className="mt-2">
-                      <img src={postImage} alt="Post preview" className="w-full h-32 object-cover rounded" />
+                      <img 
+                        src={postImage} 
+                        alt="Post preview" 
+                        className="w-full h-32 object-cover rounded"
+                        onLoad={() => console.log('✅ Image loaded in modal')}
+                        onError={() => console.error('❌ Image failed to load in modal')}
+                      />
+                    </div>
+                  ) : (
+                    <div className="mt-2 flex items-center justify-center h-32 bg-gray-200 rounded">
+                      <div className="text-center">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                        <p className="text-xs text-gray-500">Capturing image...</p>
+                      </div>
                     </div>
                   )}
                 </div>
