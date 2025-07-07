@@ -6,6 +6,27 @@ import { FacebookPostModal } from '@/components/FacebookPostModal';
 import { useUser } from '@clerk/nextjs';
 import { uploadImageToSupabase } from '@/lib/storage';
 
+// Types for calendar integration
+interface DailyContent {
+  id: string;
+  post_date: string;
+  content_type: string;
+  platform: string;
+  optimal_time: string;
+  caption: string;
+  hashtags: string;
+  cta: string;
+  image_description: string;
+  status: string;
+}
+
+interface ContentCalendar {
+  id: string;
+  month: number;
+  year: number;
+  daily_content: DailyContent[];
+}
+
 // Ayrshare posting utility (client-side, for MVP)
 async function postToAyrshare({ post, imageUrl }: { post: string, imageUrl?: string | null }) {
   const apiKey = process.env.NEXT_PUBLIC_AYRSHARE_API_KEY;
@@ -87,6 +108,14 @@ export default function ContentPage() {
   const postPreviewRef = useRef<HTMLDivElement>(null);
   const { user } = useUser();
 
+  // Calendar integration state
+  const [calendar, setCalendar] = useState<ContentCalendar | null>(null);
+  const [selectedContent, setSelectedContent] = useState<DailyContent | null>(null);
+  const [calendarLoading, setCalendarLoading] = useState(false);
+  const [calendarError, setCalendarError] = useState<string | null>(null);
+  const [currentDate, setCurrentDate] = useState<Date>(new Date());
+  const [isClient, setIsClient] = useState(false);
+
   const templates = [
     { id: 'social-post', name: 'Social Media Post', icon: '📱' },
     { id: 'story', name: 'Instagram Story', icon: '📖' },
@@ -105,6 +134,113 @@ export default function ContentPage() {
   const trendingHashtags = [
     '#important', '#business', '#marketing', '#growth', '#innovation', '#success'
   ];
+
+  // Initialize client-side state
+  useEffect(() => {
+    setCurrentDate(new Date());
+    setIsClient(true);
+  }, []);
+
+  // Load calendar data
+  useEffect(() => {
+    if (user && isClient) {
+      const currentMonth = currentDate.getMonth() + 1;
+      const currentYear = currentDate.getFullYear();
+      loadCalendar(currentMonth, currentYear);
+    }
+  }, [user, isClient, currentDate]);
+
+  const loadCalendar = async (month: number, year: number) => {
+    console.log('🔍 Loading calendar for content page:', { month, year, userId: user?.id });
+    setCalendarLoading(true);
+    setCalendarError(null);
+    
+    try {
+      const response = await fetch(`/api/calender/${month}/${year}`);
+      console.log('📡 Calendar response status:', response.status);
+      
+      const data = await response.json();
+      console.log('📊 Calendar data loaded:', data);
+      
+      setCalendar(data);
+    } catch (error: any) {
+      console.error('💥 Load calendar error:', error);
+      setCalendarError(error.message);
+    } finally {
+      setCalendarLoading(false);
+    }
+  };
+
+  const generateCalendar = async (month: number, year: number) => {
+    console.log('🚀 Generating calendar for content page:', { month, year });
+    setCalendarLoading(true);
+    setCalendarError(null);
+    
+    try {
+      const response = await fetch('/api/calender/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ month, year })
+      });
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+      
+      const data = await response.json();
+      console.log('✅ Calendar generated for content page:', data);
+      
+      if (data.success) {
+        setCalendar(data.calendar);
+      } else {
+        throw new Error(data.error || 'Unknown error');
+      }
+    } catch (error: any) {
+      console.error('❌ Failed to generate calendar:', error);
+      setCalendarError(error.message);
+    } finally {
+      setCalendarLoading(false);
+    }
+  };
+
+  // Handle content selection
+  const handleContentSelect = (content: DailyContent) => {
+    console.log('📝 Selected content for editing:', content);
+    setSelectedContent(content);
+    
+    // Populate the editor with the selected content
+    setPostContent(content.caption);
+    setSelectedContentType(content.content_type);
+    
+    // You can also populate other fields like hashtags, CTA, etc.
+    console.log('✅ Editor populated with selected content');
+  };
+
+  // Update content status after posting
+  const updateContentStatus = async (contentId: string, status: string) => {
+    try {
+      const response = await fetch('/api/calender/update-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contentId, status })
+      });
+      
+      if (response.ok) {
+        console.log('✅ Content status updated:', status);
+        // Refresh calendar data
+        const currentMonth = currentDate.getMonth() + 1;
+        const currentYear = currentDate.getFullYear();
+        loadCalendar(currentMonth, currentYear);
+      } else {
+        console.error('❌ Failed to update content status');
+      }
+    } catch (error) {
+      console.error('❌ Error updating content status:', error);
+    }
+  };
+
+
 
   const capturePostAsImage = async () => {
     if (!postPreviewRef.current) {
@@ -161,6 +297,10 @@ export default function ContentPage() {
 
       if (result.status === "success") {
         alert('✅ Posted to Facebook via Ayrshare!');
+        // Update content status if we have a selected content
+        if (selectedContent) {
+          await updateContentStatus(selectedContent.id, 'posted_facebook');
+        }
       } else if (result.errors && result.errors.length > 0) {
         alert('❌ Failed to post: ' + (result.errors[0].message || JSON.stringify(result.errors)));
       } else {
@@ -188,6 +328,11 @@ export default function ContentPage() {
       });
       alert('✅ Posted to Instagram successfully!');
       console.log('Instagram post result:', result);
+      
+      // Update content status if we have a selected content
+      if (selectedContent) {
+        await updateContentStatus(selectedContent.id, 'posted_instagram');
+      }
     } catch (error: any) {
       alert('❌ Failed to post to Instagram: ' + (error.message || error));
       console.error('Instagram posting error:', error);
@@ -259,119 +404,128 @@ export default function ContentPage() {
       }
     });
   };
+
+  // Get status color for content items
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'draft': return 'bg-gray-100 text-gray-700';
+      case 'scheduled': return 'bg-blue-100 text-blue-700';
+      case 'posted_facebook': return 'bg-green-100 text-green-700';
+      case 'posted_instagram': return 'bg-pink-100 text-pink-700';
+      default: return 'bg-gray-100 text-gray-700';
+    }
+  };
+
+  // Format date for display
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric',
+      weekday: 'short'
+    });
+  };
+
   return (
     <>
       <SimpleSidebar onToggle={setSidebarCollapsed} />
       <div className={`flex h-screen bg-gray-50 transition-all duration-300 ${
         sidebarCollapsed ? 'ml-16' : 'ml-64'
       }`}>
+        {/* Calendar Content Sidebar */}
         <div className={`bg-white border-r border-gray-200 overflow-y-auto transition-all duration-300 ${
           sidebarCollapsed ? 'w-72' : 'w-80'
         }`}>
           <div className="p-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-6">Content Creator</h2>
+            <h2 className="text-xl font-semibold text-gray-900 mb-6">AI Content Calendar</h2>
             
-            <div className="mb-8">
-              <h3 className="text-sm font-medium text-gray-700 mb-3">Templates</h3>
+            {/* Calendar Header */}
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-medium text-gray-700">
+                {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+              </h3>
+              <button
+                onClick={() => {
+                  const currentMonth = currentDate.getMonth() + 1;
+                  const currentYear = currentDate.getFullYear();
+                  generateCalendar(currentMonth, currentYear);
+                }}
+                className="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+              >
+                Generate
+              </button>
+            </div>
+
+            {/* Loading State */}
+            {calendarLoading && (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                <span className="ml-2 text-sm text-gray-600">Loading calendar...</span>
+              </div>
+            )}
+
+            {/* Error State */}
+            {calendarError && (
+              <div className="text-center py-4">
+                <p className="text-red-600 text-sm mb-2">{calendarError}</p>
+                <button
+                  onClick={() => {
+                    const currentMonth = currentDate.getMonth() + 1;
+                    const currentYear = currentDate.getFullYear();
+                    loadCalendar(currentMonth, currentYear);
+                  }}
+                  className="text-blue-600 text-sm hover:underline"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
+
+            {/* Content List */}
+            {calendar && calendar.daily_content && calendar.daily_content.length > 0 ? (
               <div className="space-y-2">
-                {templates.map((template) => (
-                  <button
-                    key={template.id}
-                    onClick={() => setSelectedTemplate(template.id)}
-                    className={`w-full flex items-center p-3 rounded-lg border transition-all ${
-                      selectedTemplate === template.id
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                {calendar.daily_content.map((content) => (
+                  <div
+                    key={content.id}
+                    onClick={() => handleContentSelect(content)}
+                    className={`p-3 rounded-lg border cursor-pointer transition-all hover:shadow-md ${
+                      selectedContent?.id === content.id
+                        ? 'border-blue-500 bg-blue-50'
                         : 'border-gray-200 hover:border-gray-300'
                     }`}
                   >
-                    <span className="text-xl mr-3">{template.icon}</span>
-                    <span className="font-medium">{template.name}</span>
-                  </button>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-gray-900">
+                        {formatDate(content.post_date)}
+                      </span>
+                      <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(content.status)}`}>
+                        {content.status.replace('_', ' ')}
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-600 mb-1">
+                      {content.content_type.replace('_', ' ')} • {content.platform}
+                    </div>
+                    <div className="text-xs text-gray-500 truncate">
+                      {content.caption.substring(0, 60)}...
+                    </div>
+                  </div>
                 ))}
               </div>
-            </div>
-
-            <div className="mb-8">
-              <h3 className="text-sm font-medium text-gray-700 mb-3">Product Details</h3>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm text-gray-600 mb-2">Product Name</label>
-                  <input
-                    type="text"
-                    defaultValue="Fresh Orange Juice"
-                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-600 mb-2">Key Features</label>
-                  <textarea
-                    defaultValue="100% Natural, Vitamin C Rich, Fresh Squeezed"
-                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent h-20"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-gray-600 mb-2">Price Point</label>
-                  <input
-                    type="text"
-                    defaultValue="Premium Quality"
-                    className="w-full p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div className="mb-8">
-              <h3 className="text-sm font-medium text-gray-700 mb-3">Brand Colors</h3>
-              <div className="flex space-x-2">
-                <div className="w-12 h-12 rounded-lg border-2 border-gray-200 bg-green-600" />
-                <div className="w-12 h-12 rounded-lg border-2 border-gray-200 bg-orange-500" />
-                <button className="w-12 h-12 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 hover:border-gray-400">
-                  +
+            ) : (
+              <div className="text-center py-8">
+                <p className="text-gray-500 text-sm mb-4">No content calendar found</p>
+                <button
+                  onClick={() => {
+                    const currentMonth = currentDate.getMonth() + 1;
+                    const currentYear = currentDate.getFullYear();
+                    generateCalendar(currentMonth, currentYear);
+                  }}
+                  className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+                >
+                  Generate Calendar
                 </button>
               </div>
-            </div>
-
-            <div className="mb-8">
-              <h3 className="text-sm font-medium text-gray-700 mb-3">Content Types</h3>
-              <div className="flex flex-wrap gap-2">
-                {contentTypes.map((type) => (
-                  <button
-                    key={type}
-                    onClick={() => setSelectedContentType(type.toLowerCase())}
-                    className={`px-3 py-1 rounded-full text-sm transition-all ${
-                      selectedContentType === type.toLowerCase()
-                        ? 'bg-blue-100 text-blue-800'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                  >
-                    {type}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div className="mb-8">
-              <h3 className="text-sm font-medium text-gray-700 mb-3">Tone</h3>
-              <div className="flex flex-wrap gap-2">
-                {tones.map((tone) => (
-                  <button
-                    key={tone}
-                    onClick={() => setSelectedTone(tone.toLowerCase())}
-                    className={`px-3 py-1 rounded-full text-sm transition-all ${
-                      selectedTone === tone.toLowerCase()
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                  >
-                    {tone}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <button className="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-3 px-4 rounded-lg font-medium hover:from-blue-700 hover:to-purple-700 transition-all">
-              ✨ Generate Content
-            </button>
+            )}
           </div>
         </div>
 
