@@ -1,18 +1,91 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { SimpleSidebar } from '@/components/SimpleSidebar';
 import { FacebookPostModal } from '@/components/FacebookPostModal';
+import { useUser } from '@clerk/nextjs';
+import { uploadImageToSupabase } from '@/lib/storage';
+
+// Ayrshare posting utility (client-side, for MVP)
+async function postToAyrshare({ post, imageUrl }: { post: string, imageUrl?: string | null }) {
+  const apiKey = process.env.NEXT_PUBLIC_AYRSHARE_API_KEY;
+  if (!apiKey) {
+    throw new Error('Ayrshare API key is missing');
+  }
+  const res = await fetch('https://api.ayrshare.com/api/post', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      post,
+      platforms: ['facebook'],
+      mediaUrls: imageUrl ? [imageUrl] : undefined
+    })
+  });
+  return await res.json();
+}
+
+// Instagram posting utility using Graph API
+async function postToInstagram({ imageUrl, caption, igUserId, accessToken }: { imageUrl: string, caption: string, igUserId: string, accessToken: string }) {
+  try {
+    // Step 1: Create media object
+    const createRes = await fetch(
+      `https://graph.facebook.com/v19.0/${igUserId}/media`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          image_url: imageUrl,
+          caption,
+          access_token: accessToken,
+        }),
+      }
+    );
+    const createData = await createRes.json();
+    if (createData.error) {
+      throw new Error(`Create media failed: ${createData.error.message}`);
+    }
+    if (!createData.id) {
+      throw new Error('Failed to create media object: ' + JSON.stringify(createData));
+    }
+    // Step 2: Publish media object
+    const publishRes = await fetch(
+      `https://graph.facebook.com/v19.0/${igUserId}/media_publish`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          creation_id: createData.id,
+          access_token: accessToken,
+        }),
+      }
+    );
+    const publishData = await publishRes.json();
+    if (publishData.error) {
+      throw new Error(`Publish failed: ${publishData.error.message}`);
+    }
+    if (!publishData.id) {
+      throw new Error('Failed to publish media: ' + JSON.stringify(publishData));
+    }
+    return publishData;
+  } catch (error) {
+    console.error('Instagram posting error:', error);
+    throw error;
+  }
+}
 
 export default function ContentPage() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState('social-post');
-  const [postContent, setPostContent] = useState('🍊 Refreshing start to your day! Our 100% natural orange juice is packed with Vitamin C and fresh-squeezed goodness. Perfect for a healthy lifestyle! #FreshJuice #Healthy #Natural #VitaminC');
+  const [postContent, setPostContent] = useState('🍓 Savor the taste of freshness! Our Berry Blast juice combines strawberries, blueberries, and raspberries for a sweet and tangy treat. #BerryBlast #FruitFusion #HealthyLiving');
   const [selectedTone, setSelectedTone] = useState('friendly');
   const [selectedContentType, setSelectedContentType] = useState('promotional');
   const [showFacebookModal, setShowFacebookModal] = useState(false);
   const [canvasImageData, setCanvasImageData] = useState<string>('');
   const postPreviewRef = useRef<HTMLDivElement>(null);
+  const { user } = useUser();
 
   const templates = [
     { id: 'social-post', name: 'Social Media Post', icon: '📱' },
@@ -75,16 +148,117 @@ export default function ContentPage() {
   };
 
   const handlePostNow = async () => {
-    console.log('🚀 Post Now clicked - starting image capture...');
     setShowFacebookModal(true);
     setCanvasImageData('');
     setTimeout(async () => {
       const imageData = await capturePostAsImage();
-      console.log('📸 Image capture result:', !!imageData ? 'Success' : 'Failed');
       setCanvasImageData(imageData);
+
+      // No Supabase insert, just use the Google Drive link
+      const result = await postToAyrshare({
+        post: postContent,
+      });
+
+      if (result.status === "success") {
+        alert('✅ Posted to Facebook via Ayrshare!');
+      } else if (result.errors && result.errors.length > 0) {
+        alert('❌ Failed to post: ' + (result.errors[0].message || JSON.stringify(result.errors)));
+      } else {
+        alert('❌ Failed to post: ' + (result.error || JSON.stringify(result)));
+      }
     }, 100);
   };
 
+  // Instagram handler
+  const handleInstagramPost = async () => {
+    try {
+      const accessToken = process.env.NEXT_PUBLIC_INSTAGRAM_ACCESS_TOKEN;
+      const igUserId = process.env.NEXT_PUBLIC_INSTAGRAM_USER_ID;
+      if (!accessToken || !igUserId) {
+        alert('❌ Instagram credentials missing. Check your .env file.');
+        return;
+      }
+      // Use a reliable direct image URL
+      const imageUrl = 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=800&h=600&fit=crop';
+      const result = await postToInstagram({
+        imageUrl,
+        caption: postContent,
+        igUserId,
+        accessToken
+      });
+      alert('✅ Posted to Instagram successfully!');
+      console.log('Instagram post result:', result);
+    } catch (error: any) {
+      alert('❌ Failed to post to Instagram: ' + (error.message || error));
+      console.error('Instagram posting error:', error);
+    }
+  };
+
+  // Add the handleWebShare function
+  const handleWebShare = (content: string) => {
+    const shareUrl = "https://unsplash.com/photos/a-close-up-of-some-snow-Px5UF7da7q4"; // Change to your actual page URL
+
+    if (navigator.share) {
+      navigator.share({
+        title: 'Fresh Orange Juice',
+        text: content,
+        url: shareUrl,
+      })
+        .then(() => console.log('Share successful'))
+        .catch((error) => console.log('Error sharing:', error));
+    } else {
+      // Fallback: Facebook Share Dialog (desktop)
+      window.open(
+        `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`,
+        'facebook-share-dialog',
+        'width=600,height=400'
+      );
+    }
+  };
+
+  // Load Facebook SDK
+  useEffect(() => {
+    // Only load once
+    if (document.getElementById('facebook-jssdk')) return;
+    const fbRoot = document.createElement('div');
+    fbRoot.id = 'fb-root';
+    document.body.appendChild(fbRoot);
+    const script = document.createElement('script');
+    script.id = 'facebook-jssdk';
+    script.async = true;
+    script.defer = true;
+    script.crossOrigin = 'anonymous';
+    script.src = 'https://connect.facebook.net/en_US/sdk.js';
+    document.body.appendChild(script);
+    (window as any).fbAsyncInit = function() {
+      (window as any).FB.init({
+        appId: process.env.NEXT_PUBLIC_FACEBOOK_APP_ID, // Uses your .env value
+        xfbml: true,
+        version: 'v20.0'
+      });
+    };
+  }, []);
+
+  // Facebook Share Dialog
+  const shareOnFacebook = () => {
+    const FB = (window as any).FB;
+    if (!FB) {
+      alert('Facebook SDK not loaded yet. Please try again in a moment.');
+      return;
+    }
+    FB.ui({
+      method: 'share',
+      href: 'https://unsplash.com/photos/a-close-up-of-some-snow-Px5UF7da7q4', // Must be public and have correct og:image
+      hashtag: '#FreshJuice', // Only one hashtag allowed
+      quote: '🍊 dsfdsfRefreshing start to your day! Our 100% natural orange juice is packed with Vitamin C and fresh-squeezed goodness. Perfect for a healthy lifestyle!' // May or may not appear
+    }, function(response: any) {
+      if (response && !response.error_message) {
+        alert('Posting completed.');
+      } else {
+        alert('Error while posting.');
+      }
+    });
+  };
   return (
     <>
       <SimpleSidebar onToggle={setSidebarCollapsed} />
@@ -213,12 +387,23 @@ export default function ContentPage() {
                 <span>Schedule post</span>
               </button>
             </div>
-            <button 
-              onClick={handlePostNow}
-              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 font-medium"
-            >
-              Post now →
-            </button>
+            <div className="flex flex-col space-y-2">
+              <button 
+                onClick={handlePostNow}
+                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 font-medium"
+              >
+                Post now → Facebook
+              </button>
+              <button 
+                onClick={handleInstagramPost}
+                className="bg-gradient-to-r from-pink-500 to-yellow-500 text-white px-6 py-2 rounded-lg hover:from-pink-600 hover:to-yellow-600 font-medium flex items-center justify-center"
+              >
+                <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                </svg>
+                Post now → Instagram
+              </button>
+            </div>
           </div>
 
           <div className="flex-1 p-8 overflow-auto bg-gray-100">
@@ -318,6 +503,19 @@ export default function ContentPage() {
                       </div>
                     </div>
                   </div>
+                </div>
+
+                {/* Share Button - updated to use Facebook SDK */}
+                <div className="flex justify-end mt-4">
+                  <button
+                    onClick={shareOnFacebook}
+                    className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+                  >
+                    <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M18 8a3 3 0 0 0-2.83 2H8.83A3 3 0 1 0 6 14.83v.34A3 3 0 1 0 8.83 20h6.34A3 3 0 1 0 18 14.83v-.34A3 3 0 1 0 15.17 8h2.66A3 3 0 1 0 18 8z" />
+                    </svg>
+                    Share on Facebook
+                  </button>
                 </div>
 
                 <div className="px-4 py-3">

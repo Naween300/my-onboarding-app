@@ -88,3 +88,19 @@ export class StorageService {
     }
   }
 }
+
+export async function uploadImageToSupabase(base64Image: string, userId: string) {
+  // Remove the data URL prefix
+  const base64Data = base64Image.replace(/^data:image\/png;base64,/, '');
+  const fileName = `post-images/${userId}-${Date.now()}.png`;
+  const { data, error } = await supabase.storage
+    .from('public-images') // Make sure this bucket exists and is public
+    .upload(fileName, base64Data, {
+      contentType: 'image/png',
+      upsert: true,
+    });
+  if (error) throw error;
+  // Get the public URL
+  const { publicUrl } = supabase.storage.from('public-images').getPublicUrl(fileName).data;
+  return publicUrl;
+}

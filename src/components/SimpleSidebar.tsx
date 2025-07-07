@@ -21,6 +21,7 @@ export const SimpleSidebar = ({ onToggle }: SidebarProps) => {
     { href: '/strategy', label: 'Strategy', icon: '🎯', description: 'Content Plans' },
     { href: '/calendar', label: 'Calendar', icon: '📅', description: 'Schedule' },
     { href: '/trends', label: 'Trends', icon: '📈', description: 'Market Insights' },
+    { href: '/socials', label: 'Socials', icon: '🔗', description: 'Connect Social Accounts' },
   ];
 
   const handleToggle = () => {
@@ -30,13 +31,22 @@ export const SimpleSidebar = ({ onToggle }: SidebarProps) => {
   };
 
   return (
-    <div className={`fixed top-0 left-0 h-full bg-white shadow-lg border-r border-gray-200 z-50 transition-all duration-300 ${
-      isCollapsed ? 'w-16' : 'w-64'
-    }`}>
+    <div 
+      className={`fixed top-0 left-0 h-full bg-white shadow-lg border-r border-gray-200 z-50 transition-all duration-300 ${
+        isCollapsed ? 'w-16' : 'w-64'
+      }`}
+      suppressHydrationWarning={true}
+    >
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-gray-200">
+      <div 
+        className="flex items-center justify-between p-4 border-b border-gray-200"
+        suppressHydrationWarning={true}
+      >
         {!isCollapsed && (
-          <div className="flex items-center space-x-2">
+          <div 
+            className="flex items-center space-x-2"
+            suppressHydrationWarning={true}
+          >
             <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
               <span className="text-white font-bold text-sm">SME</span>
             </div>
@@ -85,9 +95,22 @@ export const SimpleSidebar = ({ onToggle }: SidebarProps) => {
                 <span className="text-xl flex-shrink-0">{item.icon}</span>
                 
                 {!isCollapsed && (
-                  <div className="ml-3 flex-1 min-w-0">
-                    <div className="font-medium">{item.label}</div>
-                    <div className="text-xs text-gray-500 truncate">{item.description}</div>
+                  <div 
+                    className="ml-3 flex-1 min-w-0"
+                    suppressHydrationWarning={true}
+                  >
+                    <div 
+                      className="font-medium"
+                      suppressHydrationWarning={true}
+                    >
+                      {item.label}
+                    </div>
+                    <div 
+                      className="text-xs text-gray-500 truncate"
+                      suppressHydrationWarning={true}
+                    >
+                      {item.description}
+                    </div>
                   </div>
                 )}
 
@@ -117,9 +140,22 @@ export const SimpleSidebar = ({ onToggle }: SidebarProps) => {
               title={isCollapsed ? user.fullName || 'User' : undefined}
             />
             {!isCollapsed && (
-              <div className="flex-1 min-w-0">
-                <div className="font-medium text-gray-900 truncate">{user.fullName}</div>
-                <div className="text-xs text-gray-500 truncate">{user.primaryEmailAddress?.emailAddress}</div>
+              <div 
+                className="flex-1 min-w-0"
+                suppressHydrationWarning={true}
+              >
+                <div 
+                  className="font-medium text-gray-900 truncate"
+                  suppressHydrationWarning={true}
+                >
+                  {user.fullName}
+                </div>
+                <div 
+                  className="text-xs text-gray-500 truncate"
+                  suppressHydrationWarning={true}
+                >
+                  {user.primaryEmailAddress?.emailAddress}
+                </div>
               </div>
             )}
           </div>

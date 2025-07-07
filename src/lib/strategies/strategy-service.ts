@@ -1,3 +1,4 @@
+import { createClient } from '@supabase/supabase-js';
 import { StrategySelector } from './strategy-selector';
 import { OnboardingData } from './types';
 
@@ -6,7 +7,15 @@ export class StrategyService {
   private strategySelector = new StrategySelector();
 
   constructor(supabaseClient?: any) {
-    this.supabase = supabaseClient;
+    // If no client is passed, create one using environment variables
+    if (supabaseClient) {
+      this.supabase = supabaseClient;
+    } else {
+      this.supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY! // Use service role key for server-side operations
+      );
+    }
   }
 
   async assignStrategyToUser(userId: string): Promise<string> {
@@ -64,6 +73,11 @@ export class StrategyService {
 
   async getUserStrategy(userId: string) {
     try {
+      // Add a check to ensure supabase is initialized
+      if (!this.supabase) {
+        throw new Error('Supabase client not initialized');
+      }
+
       const { data, error } = await this.supabase
         .from('user_strategy_assignments')
         .select('*')
