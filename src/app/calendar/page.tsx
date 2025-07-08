@@ -291,7 +291,7 @@ export default function CalendarPage() {
       <SimpleSidebar onToggle={setSidebarCollapsed} />
       <div 
         className={`p-6 transition-all duration-300 ${
-          sidebarCollapsed ? 'ml-16' : 'ml-64'
+        sidebarCollapsed ? 'ml-16' : 'ml-64'
         }`}
         suppressHydrationWarning={true}
       >
@@ -313,9 +313,9 @@ export default function CalendarPage() {
                 >
                   ←
                 </button>
-                <h2 className="text-xl font-semibold">
-                  {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-                </h2>
+              <h2 className="text-xl font-semibold">
+                {currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+              </h2>
                 <button
                   onClick={() => navigateMonth('next')}
                   className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200"
@@ -357,7 +357,7 @@ export default function CalendarPage() {
               <div>
                 <strong>Month/Year:</strong> {currentMonth}/{currentYear}
               </div>
-              <div>
+                  <div>
                 <strong>Daily Content Count:</strong> {calendar?.daily_content?.length || 0}
               </div>
             </div>
@@ -423,7 +423,7 @@ export default function CalendarPage() {
               <div>
                 <h4 className="font-medium text-gray-700 mb-2">🎯 Call to Action</h4>
                 <p className="text-gray-600 bg-gray-50 p-3 rounded">{selectedContent.cta}</p>
-              </div>
+                  </div>
 
               <div className="flex items-center justify-between pt-4 border-t">
                 <div className="text-sm text-gray-500">
