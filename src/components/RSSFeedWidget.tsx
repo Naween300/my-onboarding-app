@@ -349,7 +349,7 @@ export const RSSFeedWidget = ({ userBusinessType, hideIndustrySelector = false }
                   href={article.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="bg-gray-50 rounded-lg p-4 hover:shadow-md transition-shadow block"
+                  className="no-underline bg-gray-50 rounded-lg p-4 hover:shadow-md transition-shadow block"
                 >
                   <div className="h-32 bg-gradient-to-br from-blue-100 to-blue-200 rounded mb-4 flex items-center justify-center">
                     <div className="text-blue-600 text-2xl">📰</div>
@@ -379,7 +379,7 @@ export const RSSFeedWidget = ({ userBusinessType, hideIndustrySelector = false }
                     href={article.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="bg-gray-50 rounded-lg p-4 hover:shadow-md transition-shadow block"
+                    className="no-underline bg-gray-50 rounded-lg p-4 hover:shadow-md transition-shadow block"
                   >
                     <div className="h-32 bg-gradient-to-br from-green-100 to-green-200 rounded mb-4 flex items-center justify-center">
                       <div className="text-green-600 text-2xl">📰</div>

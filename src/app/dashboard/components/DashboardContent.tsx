@@ -11,6 +11,7 @@ import TrendingInsightsWidget from './TrendingInsightsWidget';
 import { RSSFeedWidget } from '@/components/RSSFeedWidget';
 import ClientOnly from '@/components/ClientOnly';
 import SafeRender from '@/components/SafeRender';
+import { Button } from '@/components/ui/Button';
 
 export default function DashboardContent() {
   const { user, isLoaded } = useUser();
@@ -117,39 +118,36 @@ export default function DashboardContent() {
         <div className="text-center">
           <div className="text-red-500 text-4xl mb-4">⚠️</div>
           <p className="text-red-600 mb-4">{error}</p>
-          <button 
-            onClick={() => window.location.reload()}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md"
-          >
+          <Button variant="destructive" className="px-4 py-2 rounded-md" onClick={() => window.location.reload()}>
             Retry
-          </button>
+          </Button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* Header Section */}
-      <div className="bg-white shadow-sm border-b border-gray-200 px-6 py-4">
+      <div className="bg-card shadow-sm border-b border-border px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">
+            <h1 className="text-2xl font-bold text-foreground">
               {brandName} SME Intelligence
             </h1>
-            <p className="text-sm text-gray-600">AI-Powered Business Dashboard</p>
+            <p className="text-sm text-muted-foreground">AI-Powered Business Dashboard</p>
           </div>
           <div className="flex items-center space-x-4">
             {/* User Info Section */}
             <div className="text-right">
-              <div className="text-sm text-gray-500">Business Type</div>
-              <div className="text-sm font-medium text-gray-900">
+              <div className="text-sm text-muted-foreground">Business Type</div>
+              <div className="text-sm font-medium text-foreground">
                 {onboardingData?.businessType || userProfile?.businessType || 'Not specified'}
               </div>
             </div>
             <div className="text-right">
-              <div className="text-sm text-gray-500">Customer Focus</div>
-              <div className="text-sm font-medium text-gray-900">
+              <div className="text-sm text-muted-foreground">Customer Focus</div>
+              <div className="text-sm font-medium text-foreground">
                 {(onboardingData?.customerType || userProfile?.customerType)?.toUpperCase() || 'Not specified'}
               </div>
             </div>
@@ -158,8 +156,8 @@ export default function DashboardContent() {
             {user ? (
               <div className="flex items-center space-x-3">
                 <div className="text-right">
-                  <div className="text-sm text-gray-500">Welcome back</div>
-                  <div className="text-sm font-medium text-gray-900">
+                  <div className="text-sm text-muted-foreground">Welcome back</div>
+                  <div className="text-sm font-medium text-foreground">
                     {user.fullName || user.emailAddresses[0]?.emailAddress}
                   </div>
                 </div>
@@ -169,14 +167,14 @@ export default function DashboardContent() {
                   className="w-8 h-8 rounded-full"
                 />
                 <SignOutButton>
-                  <button className="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700">
+                  <Button variant="outline" className="px-3 py-1 text-sm">
                     Sign Out
-                  </button>
+                  </Button>
                 </SignOutButton>
               </div>
             ) : (
-              <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                <span className="text-white text-sm font-medium">
+              <div className="w-8 h-8 bg-muted rounded-full flex items-center justify-center">
+                <span className="text-foreground text-sm font-medium">
                   {brandName ? brandName.charAt(0).toUpperCase() : 'U'}
                 </span>
               </div>
@@ -189,48 +187,48 @@ export default function DashboardContent() {
       <div className="p-6">
         {/* Top Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white rounded-lg shadow p-4 border-l-4 border-blue-500">
+          <div className="bg-card rounded-lg shadow p-4 border border-border">
             <div className="flex items-center">
-              <div className="text-blue-500 text-2xl mr-3">🏢</div>
+              <div className="text-muted-foreground text-2xl mr-3">🏢</div>
               <div>
-                <div className="text-sm text-gray-500">Business</div>
-                <div className="text-lg font-semibold text-gray-900">
+                <div className="text-sm text-muted-foreground">Business</div>
+                <div className="text-lg font-semibold text-foreground">
                   {brandName || onboardingData?.businessName || 'Not set'}
                 </div>
               </div>
             </div>
           </div>
           
-          <div className="bg-white rounded-lg shadow p-4 border-l-4 border-green-500">
+          <div className="bg-card rounded-lg shadow p-4 border border-border">
             <div className="flex items-center">
-              <div className="text-green-500 text-2xl mr-3">💰</div>
+              <div className="text-muted-foreground text-2xl mr-3">💰</div>
               <div>
-                <div className="text-sm text-gray-500">Budget</div>
-                <div className="text-lg font-semibold text-gray-900">
+                <div className="text-sm text-muted-foreground">Budget</div>
+                <div className="text-lg font-semibold text-foreground">
                   ${onboardingData?.budget || onboardingData?.userBudget || userProfile?.userBudget || 'Not set'}
                 </div>
               </div>
             </div>
           </div>
           
-          <div className="bg-white rounded-lg shadow p-4 border-l-4 border-purple-500">
+          <div className="bg-card rounded-lg shadow p-4 border border-border">
             <div className="flex items-center">
-              <div className="text-purple-500 text-2xl mr-3">⏱️</div>
+              <div className="text-muted-foreground text-2xl mr-3">⏱️</div>
               <div>
-                <div className="text-sm text-gray-500">Timeline</div>
-                <div className="text-lg font-semibold text-gray-900">
+                <div className="text-sm text-muted-foreground">Timeline</div>
+                <div className="text-lg font-semibold text-foreground">
                   {onboardingData?.timeline || userProfile?.timeline || 'Not set'}
                 </div>
               </div>
             </div>
           </div>
           
-          <div className="bg-white rounded-lg shadow p-4 border-l-4 border-orange-500">
+          <div className="bg-card rounded-lg shadow p-4 border border-border">
             <div className="flex items-center">
-              <div className="text-orange-500 text-2xl mr-3">🎯</div>
+              <div className="text-muted-foreground text-2xl mr-3">🎯</div>
               <div>
-                <div className="text-sm text-gray-500">Status</div>
-                <div className="text-lg font-semibold text-green-600">
+                <div className="text-sm text-muted-foreground">Status</div>
+                <div className="text-lg font-semibold text-foreground">
                   {user ? 'Authenticated' : 'Active'}
                 </div>
               </div>

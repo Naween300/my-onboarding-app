@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { smeApi, ContentGenerationRequest, GeneratedContent } from '@/lib/sme-api';
 import { useSupabase } from '@/contexts/SupabaseContext';
 import { useUser } from '@clerk/nextjs';
+import { Card } from '@/components/ui/Card';
+import { Button } from '@/components/ui/Button';
 
 interface UserProfile {
   name: string;
@@ -97,25 +99,22 @@ export default function ContentGenerationWidget({ user }: ContentGenerationWidge
   // ✅ Handle error states gracefully
   if (error) {
     return (
-      <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+      <Card className="bg-red-50 border border-red-200 rounded-lg p-4">
         <h3 className="text-red-800 font-semibold">Profile Error</h3>
         <p className="text-red-700">{error}</p>
-        <button 
-          onClick={() => window.location.reload()}
-          className="mt-2 bg-red-600 text-white px-3 py-1 rounded text-sm"
-        >
+        <Button variant="destructive" size="sm" className="mt-2" onClick={() => window.location.reload()}>
           Retry
-        </button>
-      </div>
+        </Button>
+      </Card>
     );
   }
 
   // ✅ Show loading state
-    if (!userProfile) {
+  if (!userProfile) {
     return (
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+      <Card className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <div className="animate-pulse">Loading user profile...</div>
-      </div>
+      </Card>
     );
   }
 
@@ -148,68 +147,65 @@ export default function ContentGenerationWidget({ user }: ContentGenerationWidge
 
   // ✅ Render content generation widget with profile data
   return (
-    <div className="bg-white rounded-lg shadow p-6">
+    <Card className="p-6">
       <h2 className="text-xl font-semibold mb-4">AI Content Generation</h2>
       <p>Welcome, {userProfile.name}!</p>
       <p>Business: {userProfile.onboarding?.business_name}</p>
 
       {/* Generate Button */}
-      <button
+      <Button
         onClick={generateContent}
         disabled={isGenerating}
-        className={`w-full py-3 px-4 rounded-lg font-medium transition-colors ${
-          isGenerating
-            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-            : 'bg-blue-600 text-white hover:bg-blue-700'
-        }`}
+        variant="default"
+        className="w-full py-3 px-4 rounded-lg font-medium mt-4"
       >
         {isGenerating ? (
           <div className="flex items-center justify-center">
-            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-muted-foreground mr-2"></div>
             Generating Content...
           </div>
         ) : (
           '🤖 Generate AI Content for My Business'
         )}
-      </button>
+      </Button>
 
       {/* Generated Content Display */}
       {generatedContent && (
-        <div className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
+        <Card className="mt-6 p-4 bg-green-50 border border-green-200 rounded-lg">
           <h4 className="text-lg font-semibold text-green-900 mb-2">Generated Content</h4>
-            {generatedContent.caption && (
+          {generatedContent.caption && (
             <div className="mb-2">
               <span className="font-medium">Caption:</span> {generatedContent.caption}
-              </div>
-            )}
-            {generatedContent.hashtags && (
+            </div>
+          )}
+          {generatedContent.hashtags && (
             <div className="mb-2">
               <span className="font-medium">Hashtags:</span> {Array.isArray(generatedContent.hashtags) ? generatedContent.hashtags.join(', ') : generatedContent.hashtags}
-              </div>
-            )}
-            {generatedContent.posting_strategy && (
+            </div>
+          )}
+          {generatedContent.posting_strategy && (
             <div className="mb-2">
               <span className="font-medium">Posting Strategy:</span> {generatedContent.posting_strategy}
-              </div>
-            )}
+            </div>
+          )}
           {generatedContent.trending_insights && Array.isArray(generatedContent.trending_insights) && generatedContent.trending_insights.length > 0 && (
             <div className="mb-2">
               <span className="font-medium">Trending Insights:</span>
               <ul className="list-disc list-inside ml-4">
                 {generatedContent.trending_insights.map((insight, idx) => (
                   <li key={idx}>{insight}</li>
-                  ))}
-                </ul>
-              </div>
-            )}
+                ))}
+              </ul>
+            </div>
+          )}
           {generatedContent.analytics && (
             <div className="mt-4">
               <span className="font-medium">Analytics:</span>
               <pre className="bg-white p-2 rounded border mt-1 text-xs overflow-x-auto">{JSON.stringify(generatedContent.analytics, null, 2)}</pre>
-          </div>
+            </div>
           )}
-        </div>
+        </Card>
       )}
-    </div>
+    </Card>
   );
 }
