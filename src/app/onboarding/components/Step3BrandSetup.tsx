@@ -2,36 +2,66 @@
 
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { step3Schema } from '@/lib/validations';
+import { step3MarketSchema } from '@/lib/validations';
 import { useState } from 'react';
 import { OnboardingData } from '@/lib/types';
 import { StorageService } from '@/lib/storage';
 import { DatabaseService } from '@/lib/database';
 
-const colorSuggestions = [
-  { name: 'Blue', value: '#3B82F6', description: 'Trust & Professional' },
-  { name: 'Green', value: '#10B981', description: 'Growth & Nature' },
-  { name: 'Purple', value: '#8B5CF6', description: 'Creative & Luxury' },
-  { name: 'Red', value: '#EF4444', description: 'Energy & Passion' },
-  { name: 'Orange', value: '#F97316', description: 'Friendly & Warm' },
-  { name: 'Pink', value: '#EC4899', description: 'Playful & Modern' },
-  { name: 'Indigo', value: '#6366F1', description: 'Deep & Sophisticated' },
-  { name: 'Teal', value: '#14B8A6', description: 'Fresh & Balanced' },
-  { name: 'Yellow', value: '#F59E0B', description: 'Optimistic & Bold' },
-  { name: 'Slate', value: '#64748B', description: 'Professional & Clean' },
+const customerTypeOptions = [
+  { value: 'b2b', label: '🏢 Businesses (B2B)' },
+  { value: 'b2c', label: '👥 Consumers (B2C)' },
+  { value: 'both', label: '🔄 Both' },
 ];
-
-const budgetOptions = [
-  { value: 100, label: '$100', description: 'Basic package' },
-  { value: 250, label: '$250', description: 'Starter package' },
-  { value: 500, label: '$500', description: 'Professional package' },
-  { value: 1000, label: '$1,000', description: 'Premium package' },
-  { value: 2000, label: '$2,000+', description: 'Enterprise package' },
+const idealCustomerOptions = [
+  { value: 'business_owners', label: '👔 Business owners' },
+  { value: 'marketing_managers', label: '🎯 Marketing managers' },
+  { value: 'individual_consumers', label: '👥 Individual consumers' },
+  { value: 'large_corporations', label: '🏢 Large corporations' },
+  { value: 'startups', label: '🚀 Startups' },
+  { value: 'professionals', label: '👨‍💼 Professionals' },
+  { value: 'students', label: '👩‍🎓 Students' },
+  { value: 'families', label: '👪 Families' },
+  { value: 'homeowners', label: '🏠 Homeowners' },
+  { value: 'freelancers', label: '💼 Freelancers' },
+];
+const customerChallengeOptions = [
+  { value: 'affordable', label: '💰 Finding affordable solutions' },
+  { value: 'saving_time', label: '⏰ Saving time' },
+  { value: 'results', label: '🎯 Getting results' },
+  { value: 'trustworthy', label: '🤝 Finding trustworthy providers' },
+  { value: 'learning', label: '📚 Learning new skills' },
+  { value: 'technical', label: '🔧 Technical problems' },
+  { value: 'other', label: '✏️ Other' },
+];
+const audienceTopicOptions = [
+  { value: 'tips', label: '💡 Tips & tutorials' },
+  { value: 'news', label: '📊 Industry news' },
+  { value: 'success', label: '🎯 Success stories' },
+  { value: 'cost', label: '💰 Cost-saving ideas' },
+  { value: 'trends', label: '🚀 New trends' },
+  { value: 'problem', label: '🔧 Problem-solving' },
+  { value: 'behind', label: '🏆 Behind-the-scenes' },
+  { value: 'growth', label: '📈 Business growth' },
+  { value: 'networking', label: '🤝 Networking' },
+  { value: 'inspiration', label: '🎨 Inspiration' },
+];
+const teamSizeOptions = [
+  { value: 'just_me', label: '👤 Just me' },
+  { value: '2_5_members', label: '👥 2-5 team members' },
+  { value: '6_20_members', label: '🏢 6-20 team members' },
+  { value: '20_plus', label: '🏭 20+ team members' },
+];
+const businessAgeOptions = [
+  { value: 'less_1_year', label: '🆕 Less than 1 year' },
+  { value: '1_3_years', label: '📅 1-3 years' },
+  { value: '3_10_years', label: '🏢 3-10 years' },
+  { value: '10_plus', label: '🏆 10+ years' },
 ];
 
 interface Step3Props {
-  data: Partial<OnboardingData>;
-  onSubmit: (data: Partial<OnboardingData>) => void;
+  data: any; // Change to OnboardingFormData if importable
+  onSubmit: (data: any) => void; // Change to (data: OnboardingFormData) => void if importable
   onBack: () => void;
   isCompleting?: boolean;
 }
@@ -54,19 +84,18 @@ export const Step3BrandSetup = ({ data, onSubmit, onBack, isCompleting = false }
     watch,
     trigger
   } = useForm({
-    resolver: zodResolver(step3Schema),
+    resolver: zodResolver(step3MarketSchema),
     mode: 'onChange',
     defaultValues: {
-      contactInfo: data.contactInfo || {
-        website: '',
-        phone: '',
-        socialHandles: ''
-      },
-      timeline: data.timeline || 'steady',
+      customer_type: (data.customer_type as 'b2b' | 'b2c' | 'both') || undefined,
+      ideal_customers: data.ideal_customers || [],
+      customer_biggest_challenge: data.customer_biggest_challenge || '',
+      customer_biggest_challenge_other: data.customer_biggest_challenge_other || '',
+      competitors: data.competitors || [{ url: '', description: '' }],
+      competitors_skipped: data.competitors_skipped || false,
+      audience_topics: data.audience_topics || [],
     },
   });
-
-  const timeline = watch('timeline');
 
   // Enhanced logo upload with drag & drop
   const handleDrag = (e: React.DragEvent) => {
@@ -100,12 +129,7 @@ export const Step3BrandSetup = ({ data, onSubmit, onBack, isCompleting = false }
   };
 
   const handleColorChange = (type: 'primary' | 'secondary', color: string) => {
-    setColors(prev => ({ ...prev, [type]: color }));
-  };
-
-  const getBudgetDescription = (value: number) => {
-    const option = budgetOptions.find(opt => opt.value === value);
-    return option?.description || 'Custom budget';
+    setColors((prev: { primary: string; secondary: string }) => ({ ...prev, [type]: color }));
   };
 
   const handleFormSubmit = async (formData: any) => {
@@ -132,6 +156,9 @@ export const Step3BrandSetup = ({ data, onSubmit, onBack, isCompleting = false }
         contactInfo: formData.contactInfo,
         budget,
         timeline: formData.timeline,
+        audience_topics: formData.audience_topics,
+        team_size: formData.team_size,
+        business_age: formData.business_age,
         ...(logo ? { logo } : {})
       };
       
@@ -162,373 +189,238 @@ export const Step3BrandSetup = ({ data, onSubmit, onBack, isCompleting = false }
     >
   
       <div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">Brand Setup</h2>
-        
-        {/* Enhanced Logo Upload with Drag & Drop */}
-        <fieldset className="mb-8">
-          <legend className="block text-sm font-medium text-gray-700 mb-4">
-            Upload logo
-          </legend>
-          <div 
-            className={`border-2 border-dashed rounded-lg p-8 text-center transition-all duration-200 ${
-              dragActive 
-                ? 'border-blue-500 bg-blue-50' 
-                : logo 
-                  ? 'border-green-500 bg-green-50' 
-                  : 'border-gray-300 hover:border-gray-400'
-            }`}
-            onDragEnter={handleDrag}
-            onDragLeave={handleDrag}
-            onDragOver={handleDrag}
-            onDrop={handleDrop}
-          >
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleLogoUpload}
-              className="hidden"
-              id="logo-upload"
-              aria-label="Upload logo"
-            />
-            <label htmlFor="logo-upload" className="cursor-pointer">
-              {logo ? (
-                <div className="space-y-2">
-                  <div className="text-green-600 text-3xl">✓</div>
-                  <p className="text-sm font-medium text-green-600">
-                    {logo.name}
-                  </p>
-                  <p className="text-xs text-gray-500">Click to change or drag a new file</p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <div className="text-4xl text-gray-400">📁</div>
-                  <p className="text-sm font-medium text-gray-600">
-                    Drag & drop your logo here, or click to browse
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    PNG, JPG, SVG up to 10MB
-                  </p>
-                </div>
-              )}
-            </label>
-          </div>
-        </fieldset>
-
-        {/* Brand Colors Picker */}
+        <h2 className="text-2xl font-bold text-gray-900 mb-6">Market Intelligence</h2>
+        {/* You serve */}
         <div className="mb-8">
-          <fieldset>
-            <legend className="block text-sm font-medium text-gray-700 mb-4">
-              Brand colors
-            </legend>
-            {/* Color Suggestions */}
-            <div className="mb-6">
-              <p className="text-sm text-gray-600 mb-3">Choose from our smart suggestions:</p>
-              <div className="grid grid-cols-5 gap-3" role="radiogroup" aria-label="Color suggestions">
-                {colorSuggestions.map((color) => (
-                  <button
-                    key={color.value}
-                    type="button"
-                    role="radio"
-                    aria-checked={colors.primary === color.value}
-                    aria-label={color.name}
-                    onClick={() => handleColorChange('primary', color.value)}
-                    className={`p-3 rounded-lg border-2 transition-all duration-200 text-center hover:shadow-md ${
-                      colors.primary === color.value
-                        ? 'border-blue-500 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <div 
-                      className="w-8 h-8 rounded-full mx-auto mb-2"
-                      style={{ backgroundColor: color.value }}
-                    />
-                    <div className="text-xs font-medium text-gray-700">{color.name}</div>
-                    <div className="text-xs text-gray-500">{color.description}</div>
-                  </button>
-                ))}
-              </div>
-            </div>
-            {/* Custom Color Inputs */}
-            <div className="grid grid-cols-2 gap-6">
-              <div>
-                <label htmlFor="primaryColor" className="block text-sm font-medium text-gray-700 mb-2">
-                  Primary Color
-                </label>
-                <div className="flex items-center space-x-3">
-                  <input
-                    type="color"
-                    id="primaryColor"
-                    name="primaryColor"
-                    value={colors.primary}
-                    onChange={(e) => handleColorChange('primary', e.target.value)}
-                    className="w-12 h-12 rounded-lg border border-gray-300 cursor-pointer"
-                  />
-                  <div className="flex-1">
-                    <label htmlFor="primaryColorHex" className="block text-xs font-medium text-gray-600 mb-1">
-                      Primary Color Hex
-                    </label>
-                    <input
-                      type="text"
-                      id="primaryColorHex"
-                      name="primaryColorHex"
-                      value={colors.primary}
-                      onChange={(e) => handleColorChange('primary', e.target.value)}
-                      autoComplete="off"
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="#3B82F6"
-                    />
-                  </div>
-                </div>
-              </div>
-              <div>
-                <label htmlFor="secondaryColor" className="block text-sm font-medium text-gray-700 mb-2">
-                  Secondary Color
-                </label>
-                <div className="flex items-center space-x-3">
-                  <input
-                    type="color"
-                    id="secondaryColor"
-                    name="secondaryColor"
-                    value={colors.secondary}
-                    onChange={(e) => handleColorChange('secondary', e.target.value)}
-                    className="w-12 h-12 rounded-lg border border-gray-300 cursor-pointer"
-                  />
-                  <div className="flex-1">
-                    <label htmlFor="secondaryColorHex" className="block text-xs font-medium text-gray-600 mb-1">
-                      Secondary Color Hex
-                    </label>
-                    <input
-                      type="text"
-                      id="secondaryColorHex"
-                      name="secondaryColorHex"
-                      value={colors.secondary}
-                      onChange={(e) => handleColorChange('secondary', e.target.value)}
-                      autoComplete="off"
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="#EF4444"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-            {/* Color Preview */}
-            <div className="mt-4 p-4 rounded-lg border border-gray-200 bg-gray-50">
-              <p className="text-sm font-medium text-gray-700 mb-2">Color Preview:</p>
-              <div className="flex items-center space-x-4">
-                <div className="flex items-center space-x-2">
-                  <div 
-                    className="w-6 h-6 rounded"
-                    style={{ backgroundColor: colors.primary }}
-                  />
-                  <span className="text-sm text-gray-600">Primary</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <div 
-                    className="w-6 h-6 rounded"
-                    style={{ backgroundColor: colors.secondary }}
-                  />
-                  <span className="text-sm text-gray-600">Secondary</span>
-                </div>
-              </div>
-            </div>
-          </fieldset>
-        </div>
-
-        {/* Enhanced Contact Info */}
-        <fieldset className="mb-8">
-          <legend className="block text-sm font-medium text-gray-700 mb-4">
-            Contact information
-          </legend>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label htmlFor="website" className="block text-xs font-medium text-gray-600 mb-1">
-                Website
-              </label>
-              <input
-                {...register('contactInfo.website')}
-                id="website"
-                name="website"
-                type="url"
-                autoComplete="off"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="https://yourwebsite.com"
-              />
-              {errors.contactInfo?.website && (
-                <p className="mt-1 text-xs text-red-600">{errors.contactInfo.website.message}</p>
-              )}
-            </div>
-            
-            <div>
-              <label htmlFor="phone" className="block text-xs font-medium text-gray-600 mb-1">
-                Phone
-              </label>
-              <input
-                {...register('contactInfo.phone')}
-                id="phone"
-                name="phone"
-                type="tel"
-                autoComplete="off"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="+1 (555) 123-4567"
-              />
-            </div>
-            
-            <div>
-              <label htmlFor="socialHandles" className="block text-xs font-medium text-gray-600 mb-1">
-                Social handles
-              </label>
-              <input
-                {...register('contactInfo.socialHandles')}
-                id="socialHandles"
-                name="socialHandles"
-                type="text"
-                autoComplete="off"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="@yourbrand"
-              />
-            </div>
-          </div>
-        </fieldset>
-
-        {/* Budget Slider */}
-        <div className="mb-8">
-          <label htmlFor="budget" className="block text-sm font-medium text-gray-700 mb-4">
-            Monthly budget
-          </label>
-          <div className="space-y-4">
-            <div className="flex justify-between items-center">
-              <span className="text-2xl font-bold text-blue-600">${budget.toLocaleString()}</span>
-              <span className="text-sm text-gray-500">{getBudgetDescription(budget)}</span>
-            </div>
-            <input
-              type="range"
-              id="budget"
-              name="budget"
-              min="100"
-              max="2000"
-              step="50"
-              value={budget}
-              onChange={e => setBudget(Number(e.target.value))}
-              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-            />
-          </div>
-        </div>
-
-        {/* Results Timeline */}
-        <fieldset className="mb-8">
-          <legend className="block text-sm font-medium text-gray-700 mb-4">
-            Results timeline
-          </legend>
+          <label className="block text-sm font-medium text-gray-700 mb-2">You serve *</label>
           <Controller
-            name="timeline"
+            name="customer_type"
             control={control}
             render={({ field }) => (
-              <div className="grid grid-cols-3 gap-4" role="radiogroup" aria-label="Results timeline">
-                {[
-                  { value: 'quick', label: 'Quick', icon: '🏃', description: '1-3 months', detail: 'Fast results, higher intensity' },
-                  { value: 'steady', label: 'Steady', icon: '🚶', description: '3-6 months', detail: 'Balanced approach, sustainable growth' },
-                  { value: 'long-term', label: 'Long-term', icon: '🏗️', description: '6+ months', detail: 'Strategic planning, lasting impact' },
-                ].map((option) => (
+              <div className="flex flex-wrap gap-2">
+                {customerTypeOptions.map(option => (
                   <button
-                    key={option.value}
                     type="button"
-                    role="radio"
-                    aria-checked={field.value === option.value}
-                    aria-label={option.label}
+                    key={option.value}
                     onClick={() => field.onChange(option.value)}
-                    className={`p-4 rounded-lg border-2 transition-all duration-200 text-center ${
+                    className={`px-3 py-2 rounded-full border-2 text-sm transition-all ${
                       field.value === option.value
                         ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-gray-200 hover:border-gray-300'
+                        : 'border-gray-200 hover:border-blue-300'
                     }`}
                   >
-                    <div className="text-2xl mb-2">{option.icon}</div>
-                    <div className="font-medium text-sm">{option.label}</div>
-                    <div className="text-xs text-gray-500 mt-1">{option.description}</div>
-                    <div className="text-xs text-gray-400 mt-1">{option.detail}</div>
+                    {option.label}
                   </button>
                 ))}
               </div>
             )}
           />
-          {errors.timeline && (
-            <p className="mt-2 text-sm text-red-600">{errors.timeline.message}</p>
+          {errors.customer_type && (
+            <p className="mt-2 text-sm text-red-600" role="alert">
+              {errors.customer_type?.message?.toString()}
+            </p>
           )}
-        </fieldset>
-
-        {/* Data Summary Preview */}
-        <div className="mb-8 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <h3 className="text-sm font-medium text-blue-800 mb-2">Setup Summary</h3>
-          <div className="grid grid-cols-2 gap-4 text-xs text-blue-700">
-            <div>
-              <p><strong>Business:</strong> {data.businessName}</p>
-              <p><strong>Type:</strong> {data.businessType}</p>
-              <p><strong>Budget:</strong> ${budget.toLocaleString()}</p>
-            </div>
-            <div>
-              <p><strong>Timeline:</strong> {timeline}</p>
-              <p><strong>Logo:</strong> {logo ? 'Uploaded' : 'Not uploaded'}</p>
-              <p><strong>Colors:</strong> {colors.primary} / {colors.secondary}</p>
-            </div>
-          </div>
         </div>
-
-        {process.env.NODE_ENV === 'development' && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <h4 className="font-semibold text-red-800 mb-2">🔍 Step 3 Data Debug:</h4>
-            <div className="text-sm text-red-700 space-y-1">
-              <p><strong>Has Business Type:</strong> {data.businessType ? '✅ YES' : '❌ NO'} ({data.businessType})</p>
-              <p><strong>Has Business Name:</strong> {data.businessName ? '✅ YES' : '❌ NO'} ({data.businessName})</p>
-              <p><strong>Has Goals:</strong> {data.goals?.length ? '✅ YES' : '❌ NO'} ({data.goals?.length || 0} items)</p>
-              <p><strong>Has Brand Personality:</strong> {data.brandPersonality?.length ? '✅ YES' : '❌ NO'} ({data.brandPersonality?.length || 0} items)</p>
-              <p><strong>All Data Keys:</strong> {Object.keys(data).join(', ')}</p>
+        {/* Ideal customers */}
+        <div className="mb-8">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Who's your ideal customer? <span className="text-gray-400">(Select up to 4)</span> *</label>
+          <Controller
+            name="ideal_customers"
+            control={control}
+            render={({ field }) => (
+              <div className="flex flex-wrap gap-2">
+                {idealCustomerOptions.map(option => (
+                  <button
+                    type="button"
+                    key={option.value}
+                    onClick={() => {
+                      const arr = field.value || [];
+                      if (arr.includes(option.value)) {
+                        field.onChange(arr.filter((v: string) => v !== option.value));
+                      } else if (arr.length < 4) {
+                        field.onChange([...(arr || []), option.value]);
+                      }
+                    }}
+                    className={`px-3 py-2 rounded-full border-2 text-sm transition-all ${
+                      field.value?.includes(option.value)
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-gray-200 hover:border-blue-300'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          />
+          {errors.ideal_customers && (
+            <p className="mt-2 text-sm text-red-600" role="alert">
+              {errors.ideal_customers?.message?.toString()}
+            </p>
+          )}
+        </div>
+        {/* Customer's biggest challenge */}
+        <div className="mb-8">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Your customers' biggest challenge is: *</label>
+          <Controller
+            name="customer_biggest_challenge"
+            control={control}
+            render={({ field }) => (
+              <div className="flex flex-wrap gap-2">
+                {customerChallengeOptions.map(option => (
+                  <button
+                    type="button"
+                    key={option.value}
+                    onClick={() => field.onChange(option.value)}
+                    className={`px-3 py-2 rounded-full border-2 text-sm transition-all ${
+                      field.value === option.value
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-gray-200 hover:border-blue-300'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          />
+          {watch('customer_biggest_challenge') === 'other' && (
+            <div className="mt-4">
+              <input
+                {...register('customer_biggest_challenge_other')}
+                type="text"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Please specify the other challenge"
+              />
+              {errors.customer_biggest_challenge_other && (
+                <p className="mt-2 text-sm text-red-600" role="alert">
+                  {errors.customer_biggest_challenge_other?.message?.toString()}
+                </p>
+              )}
             </div>
-            <details className="mt-2">
-              <summary className="cursor-pointer text-red-800 font-medium">Show Full Data Object</summary>
-              <pre className="text-xs bg-white p-2 rounded mt-1 overflow-auto max-h-32">
-                {JSON.stringify(data, null, 2)}
-              </pre>
-            </details>
-          </div>
-        )}
+          )}
+          {errors.customer_biggest_challenge && (
+            <p className="mt-2 text-sm text-red-600" role="alert">
+              {errors.customer_biggest_challenge?.message?.toString()}
+            </p>
+          )}
+        </div>
+        {/* Competitors */}
+        <div className="mb-8">
+          <label className="block text-sm font-medium text-gray-700 mb-2">Who are your main competitors?</label>
+          <Controller
+            name="competitors"
+            control={control}
+            render={({ field }) => (
+              <div className="space-y-4">
+                {[0, 1, 2].map((i) => (
+                  <div key={i} className="flex gap-4 items-center">
+                    <input
+                      type="url"
+                      value={field.value?.[i]?.url || ''}
+                      onChange={e => {
+                        const arr = field.value ? [...field.value] : [{}, {}, {}];
+                        arr[i] = { ...arr[i], url: e.target.value };
+                        field.onChange(arr);
+                      }}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md"
+                      placeholder={`Facebook URL for Competitor ${i + 1}`}
+                    />
+                    <input
+                      type="text"
+                      value={field.value?.[i]?.description || ''}
+                      onChange={e => {
+                        const arr = field.value ? [...field.value] : [{}, {}, {}];
+                        arr[i] = { ...arr[i], description: e.target.value };
+                        field.onChange(arr);
+                      }}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md"
+                      placeholder="What they do (optional)"
+                    />
+                  </div>
+                ))}
+                <div className="mt-2">
+                  <label className="inline-flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      {...register('competitors_skipped')}
+                      className="form-checkbox"
+                    />
+                    <span className="text-sm text-gray-600">Skip this step - we'll help you identify them later</span>
+                  </label>
+                </div>
+              </div>
+            )}
+          />
+          {errors.competitors && (
+            <p className="mt-2 text-sm text-red-600" role="alert">
+              {errors.competitors?.message?.toString()}
+            </p>
+          )}
+        </div>
+        {/* Audience topics */}
+        <div className="mb-8">
+          <label className="block text-sm font-medium text-gray-700 mb-2">What topics does your audience care about? <span className="text-gray-400">(Select up to 5)</span> *</label>
+          <Controller
+            name="audience_topics"
+            control={control}
+            render={({ field }) => (
+              <div className="flex flex-wrap gap-2">
+                {audienceTopicOptions.map(option => (
+                  <button
+                    type="button"
+                    key={option.value}
+                    onClick={() => {
+                      const arr = field.value || [];
+                      if (arr.includes(option.value)) {
+                        field.onChange(arr.filter((v: string) => v !== option.value));
+                      } else if (arr.length < 5) {
+                        field.onChange([...(arr || []), option.value]);
+                      }
+                    }}
+                    className={`px-3 py-2 rounded-full border-2 text-sm transition-all ${
+                      field.value?.includes(option.value)
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-gray-200 hover:border-blue-300'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          />
+          {errors.audience_topics && (
+            <p className="mt-2 text-sm text-red-600" role="alert">
+              {errors.audience_topics?.message?.toString()}
+            </p>
+          )}
+        </div>
       </div>
-
-      <div className="flex justify-between pt-6 border-t border-gray-200">
+      <div className="flex justify-between">
         <button
           type="button"
           onClick={onBack}
-          disabled={isStepCompleting}
-          className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors duration-200"
         >
-          Back
+          ← Back
         </button>
-        
-        {/* Update your Complete Setup button */}
         <button
-          type="button"
-          onClick={async (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            
-            // Get current form data
-            const currentFormData = {
-              contactInfo: watch('contactInfo'),
-              timeline: watch('timeline')
-            };
-            
-            console.log('🖱️ [Step3] Complete Setup clicked');
-            await handleFormSubmit(currentFormData);
-          }}
-          disabled={isStepCompleting}
-          className="flex-1 bg-gradient-to-r from-green-600 to-emerald-600 text-white py-4 px-6 rounded-lg font-semibold hover:from-green-700 hover:to-emerald-700 transition-all transform hover:scale-105"
+          type="submit"
+          className={`px-6 py-2 rounded-md font-semibold transition-all ${
+            isValid
+              ? 'bg-green-600 text-white hover:bg-green-700 transform hover:scale-105'
+              : 'bg-gray-400 text-gray-200 cursor-not-allowed'
+          }`}
+          disabled={!isValid || isStepCompleting}
         >
           {isStepCompleting ? (
             <div className="flex items-center justify-center">
               <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-              Completing Setup...
+              Saving...
             </div>
           ) : (
-            '🚀 Complete Setup & Launch!'
+            'Continue'
           )}
         </button>
       </div>

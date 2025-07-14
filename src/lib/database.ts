@@ -239,7 +239,7 @@ export class DatabaseService {
           )
         `)
         .eq('clerk_user_id', clerkUserId)
-        .single();
+        .maybeSingle();
 
       if (error) {
         // ✅ Enhanced error handling for empty objects
@@ -253,6 +253,94 @@ export class DatabaseService {
     } catch (error: any) {
       console.error('❌ Error fetching onboarding data:', error.message || error);
       return { data: null, error };
+    }
+  }
+
+  // Enhanced onboarding upsert for new table
+  static async saveEnhancedOnboardingData({
+    clerk_user_id,
+    onboardingData,
+    logoFile
+  }: {
+    clerk_user_id: string,
+    onboardingData: any,
+    logoFile?: File | null
+  }): Promise<{ data: any, error: any }> {
+    try {
+      let logo_url = onboardingData.logo_url || null;
+      // 1. Upload logo if provided
+      if (logoFile) {
+        const fileExt = logoFile.name.split('.').pop();
+        const fileName = `${clerk_user_id}_logo.${fileExt}`;
+        const { data: storageData, error: storageError } = await supabase.storage
+          .from('logos')
+          .upload(fileName, logoFile, { upsert: true });
+        if (storageError) {
+          return { data: null, error: storageError };
+        }
+        const { data: publicUrlData } = supabase.storage.from('logos').getPublicUrl(fileName);
+        logo_url = publicUrlData?.publicUrl || null;
+      }
+      // 2. Map onboardingData to table columns
+      const dbData = {
+        clerk_user_id,
+        // Step 1
+        business_offering: onboardingData.business_offering,
+        business_category: onboardingData.business_category,
+        business_name: onboardingData.business_name,
+        location_type: onboardingData.location_type,
+        location_details: onboardingData.location_details,
+        // Step 2
+        product_types: onboardingData.product_types || null,
+        product_sales_channels: onboardingData.product_sales_channels || null,
+        customer_purchase_pattern: onboardingData.customer_purchase_pattern || null,
+        product_price_range: onboardingData.product_price_range || null,
+        service_types: onboardingData.service_types || null,
+        service_delivery_methods: onboardingData.service_delivery_methods || null,
+        service_engagement_type: onboardingData.service_engagement_type || null,
+        service_price_range: onboardingData.service_price_range || null,
+        primary_focus: onboardingData.primary_focus || null,
+        products_services_connection: onboardingData.products_services_connection || null,
+        // Step 3
+        target_market: onboardingData.target_market,
+        ideal_customers: onboardingData.ideal_customers || null,
+        customer_biggest_challenge: onboardingData.customer_biggest_challenge || null,
+        audience_topics: onboardingData.audience_topics || null,
+        // Step 4
+        top_goals: onboardingData.top_goals || null,
+        primary_business_goal: onboardingData.primary_business_goal || null,
+        brand_personality: onboardingData.brand_personality || null,
+        differentiators: onboardingData.differentiators || null,
+        // Step 5
+        logo_url,
+        primary_color: onboardingData.primary_color,
+        secondary_color: onboardingData.secondary_color,
+        website: onboardingData.website,
+        phone: onboardingData.phone,
+        social_handles: onboardingData.social_handles ? JSON.stringify(onboardingData.social_handles) : null,
+        current_social_presence: onboardingData.current_social_presence ? JSON.stringify(onboardingData.current_social_presence) : null,
+        // Step 6
+        team_size: onboardingData.team_size,
+        business_age: onboardingData.business_age,
+        project_duration: onboardingData.project_duration,
+        monthly_budget: onboardingData.monthly_budget,
+        results_timeline: onboardingData.results_timeline,
+        // Progress
+        onboarding_step: onboardingData.onboarding_step || 1,
+        is_completed: onboardingData.is_completed || false,
+        completion_percentage: onboardingData.completion_percentage || 0,
+        completed_at: onboardingData.is_completed ? new Date().toISOString() : null,
+        updated_at: new Date().toISOString(),
+      };
+      // 3. Upsert to user_enhanced_onboarding
+      const { data, error } = await supabase
+        .from('user_enhanced_onboarding')
+        .upsert(dbData, { onConflict: 'clerk_user_id' })
+        .select()
+        .single();
+      return { data, error };
+    } catch (err) {
+      return { data: null, error: err };
     }
   }
 

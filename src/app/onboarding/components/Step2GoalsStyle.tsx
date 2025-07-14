@@ -1,26 +1,84 @@
 'use client';
 
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { step2Schema } from '@/lib/validations';
 import { useState } from 'react';
 
-const goalOptions = [
-  { id: 'brand-awareness', label: 'Brand awareness', icon: '📈' },
-  { id: 'generate-leads', label: 'Generate leads', icon: '🎯' },
-  { id: 'direct-sales', label: 'Direct sales', icon: '💰' },
-  { id: 'build-relationships', label: 'Build relationships', icon: '🤝' },
-  { id: 'thought-leadership', label: 'Thought leadership', icon: '🧠' },
-  { id: 'customer-support', label: 'Customer support', icon: '🛠️' },
+// Product options
+const productTypes = [
+  { value: 'physical_goods', label: '🛍️ Physical goods' },
+  { value: 'digital_products', label: '💻 Digital products' },
+  { value: 'software_apps', label: '📱 Software/Apps' },
+  { value: 'educational_materials', label: '📚 Educational materials' },
+  { value: 'creative_assets', label: '🎨 Creative assets' },
+  { value: 'food_beverages', label: '🍽️ Food/Beverages' },
+  { value: 'fashion_apparel', label: '👕 Fashion/Apparel' },
+  { value: 'home_goods', label: '🏠 Home goods' },
 ];
-
-const personalityOptions = [
-  { id: 'professional', label: 'Professional', icon: '💼' },
-  { id: 'friendly', label: 'Friendly', icon: '😊' },
-  { id: 'creative', label: 'Creative', icon: '🎨' },
-  { id: 'innovative', label: 'Innovative', icon: '🚀' },
-  { id: 'authentic', label: 'Authentic', icon: '🌱' },
-  { id: 'premium', label: 'Premium', icon: '✨' },
+const productSalesChannels = [
+  { value: 'physical_store', label: '🏪 Physical store' },
+  { value: 'online_store', label: '🌐 Online store' },
+  { value: 'mobile_app', label: '📱 Mobile app' },
+  { value: 'marketplaces', label: '🛒 Marketplaces (Amazon, Etsy)' },
+  { value: 'direct_sales', label: '📞 Direct sales' },
+  { value: 'wholesale_b2b', label: '🤝 Wholesale/B2B' },
+];
+const customerPurchasePatterns = [
+  { value: 'once', label: '💰 Once and done' },
+  { value: 'regularly', label: '🔄 Regularly (repeat purchases)' },
+  { value: 'bulk', label: '📦 In bulk/wholesale' },
+  { value: 'seasonally', label: '🎁 Seasonally' },
+  { value: 'subscription', label: '📅 On subscription' },
+];
+const productPriceRanges = [
+  { value: 'under_25', label: '💵 Under $25' },
+  { value: '25_100', label: '💰 $25-$100' },
+  { value: '100_500', label: '💎 $100-$500' },
+  { value: '500_plus', label: '🏆 $500+' },
+  { value: 'varies', label: '📊 Varies widely' },
+];
+// Service options
+const serviceTypes = [
+  { value: 'consulting', label: '🤝 Consulting/Advisory' },
+  { value: 'technical', label: '🔧 Technical services' },
+  { value: 'creative', label: '🎨 Creative services' },
+  { value: 'education', label: '📚 Education/Training' },
+  { value: 'healthcare', label: '🏥 Healthcare services' },
+  { value: 'professional', label: '💼 Professional services' },
+  { value: 'home', label: '🏠 Home services' },
+  { value: 'digital', label: '💻 Digital services' },
+];
+const serviceDeliveryMethods = [
+  { value: 'in_person', label: '🏢 In-person/on-site' },
+  { value: 'virtual', label: '💻 Virtual/online' },
+  { value: 'phone', label: '📞 Phone consultations' },
+  { value: 'video', label: '🎥 Video calls' },
+  { value: 'mobile_app', label: '📱 Mobile app' },
+  { value: 'at_location', label: '🏪 At your location' },
+];
+const serviceEngagementTypes = [
+  { value: 'one_time', label: '⚡ One-time project' },
+  { value: 'retainer', label: '🔄 Ongoing retainer' },
+  { value: 'package', label: '📅 Package/program' },
+  { value: 'hourly', label: '🎯 Hourly consultation' },
+  { value: 'custom', label: '📊 Custom contracts' },
+  { value: 'subscription', label: '🔄 Subscription model' },
+];
+const servicePriceRanges = [
+  { value: 'under_500', label: '💵 Under $500' },
+  { value: '500_2500', label: '💰 $500-$2,500' },
+  { value: '2500_10000', label: '💎 $2,500-$10,000' },
+  { value: '10000_plus', label: '🏆 $10,000+' },
+  { value: 'varies', label: '📊 Varies by project' },
+];
+// Both
+const productsServicesConnections = [
+  { value: 'services_support_products', label: '🔗 Services support product sales' },
+  { value: 'products_support_services', label: '📦 Products support service delivery' },
+  { value: 'separate', label: '🎯 Completely separate offerings' },
+  { value: 'bundled', label: '🔄 Bundled together' },
+  { value: 'custom_products', label: '💡 Services create custom products' },
 ];
 
 interface Step2Props {
@@ -30,194 +88,694 @@ interface Step2Props {
 }
 
 export const Step2GoalsStyle = ({ data, onNext, onBack }: Step2Props) => {
-  const [selectedGoals, setSelectedGoals] = useState<string[]>(
-    data.goals || data.selectedGoals || []
-  );
-  const [selectedPersonality, setSelectedPersonality] = useState<string[]>(
-    data.brand_personality || data.brandPersonality || data.selectedPersonality || []
-  );
-  const [socialMedia, setSocialMedia] = useState(
-    data.social_media_presence || data.socialMediaPresence || data.socialMedia || {
-      facebook: 'none',
-      instagram: 'none',
-      linkedin: 'none',
-    }
-  );
-
-  const { handleSubmit, formState: { errors } } = useForm({
+  const businessOffering = data.business_offering;
+  const { control, handleSubmit, watch, setValue, formState: { errors, isValid } } = useForm({
     resolver: zodResolver(step2Schema),
+    mode: 'onChange',
+    defaultValues: {
+      ...data,
+      business_offering: data.business_offering,
+    }
   });
+  const formValues = watch();
 
-  const toggleGoal = (goalId: string) => {
-    setSelectedGoals(prev => {
-      if (prev.includes(goalId)) {
-        return prev.filter(id => id !== goalId);
-      } else if (prev.length < 3) {
-        return [...prev, goalId];
+  // Helper for multi-select
+  const toggleMultiSelect = (field: string, value: string, max?: number) => {
+    const arr = formValues[field] || [];
+    if (arr.includes(value)) {
+      setValue(field, arr.filter((v: string) => v !== value));
+    } else if (!max || arr.length < max) {
+      setValue(field, [...arr, value]);
       }
-      return prev;
-    });
   };
 
-  const togglePersonality = (personalityId: string) => {
-    setSelectedPersonality(prev => {
-      if (prev.includes(personalityId)) {
-        return prev.filter(id => id !== personalityId);
-      } else {
-        return [...prev, personalityId];
-      }
-    });
+  // Helper for single select
+  const setSingleSelect = (field: string, value: string) => {
+    setValue(field, value);
   };
 
-  const updateSocialMedia = (platform: string, level: string) => {
-    setSocialMedia((prev: typeof socialMedia) => ({
-      ...prev,
-      [platform]: level,
-    }));
+  // Helper for slider
+  const setSlider = (value: number) => {
+    if (value < 33) setValue('primary_focus', 'mostly_products');
+    else if (value > 66) setValue('primary_focus', 'mostly_services');
+    else setValue('primary_focus', 'balanced');
   };
 
-  const onSubmit = () => {
-    // Transform data to match Supabase schema
-    const transformedData = {
-      goals: selectedGoals,
-      brand_personality: selectedPersonality,
-      social_media_presence: socialMedia,
-      // Keep original format for component state
-      selectedGoals,
-      brandPersonality: selectedPersonality,
-      socialMediaPresence: socialMedia,
-    };
-    onNext(transformedData);
+  const onSubmit = (values: any) => {
+    onNext(values);
   };
 
-  // Keep your original JSX design from paste-2.txt exactly as is
   return (
-    <form
-      onSubmit={e => {
-        e.preventDefault();
-        onSubmit();
-      }}
-      className="space-y-8"
-    >
-      {/* Your existing JSX from paste-2.txt goes here */}
+    <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
+      <h2 className="text-2xl font-bold text-gray-900 mb-6">Offering Details</h2>
+      {/* Products Section */}
+      {businessOffering === 'products' && (
+        <div className="space-y-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              What type of products do you sell? <span className="text-gray-400">(Select up to 3)</span> *
+            </label>
+            <Controller
+              name="product_types"
+              control={control}
+              render={({ field }) => (
+                <div className="flex flex-wrap gap-2">
+                  {productTypes.map(option => (
+                    <button
+                      type="button"
+                      key={option.value}
+                      onClick={() => {
+                        const arr = field.value || [];
+                        if (arr.includes(option.value)) {
+                          field.onChange(arr.filter((v: string) => v !== option.value));
+                        } else if (arr.length < 3) {
+                          field.onChange([...(arr || []), option.value]);
+                        }
+                      }}
+                      className={`px-3 py-2 rounded-full border-2 text-sm transition-all ${
+                        field.value?.includes(option.value)
+                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                          : 'border-gray-200 hover:border-blue-300'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            />
+            {errors.product_types && (
+              <p className="mt-2 text-sm text-red-600" role="alert">
+                {errors.product_types?.message?.toString()}
+              </p>
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Where do customers buy your products? *
+            </label>
+            <Controller
+              name="product_sales_channels"
+              control={control}
+              render={({ field }) => (
+                <div className="flex flex-wrap gap-2">
+                  {productSalesChannels.map(option => (
+                    <button
+                      type="button"
+                      key={option.value}
+                      onClick={() => {
+                        const arr = field.value || [];
+                        if (arr.includes(option.value)) {
+                          field.onChange(arr.filter((v: string) => v !== option.value));
+                        } else {
+                          field.onChange([...(arr || []), option.value]);
+                        }
+                      }}
+                      className={`px-3 py-2 rounded-full border-2 text-sm transition-all ${
+                        field.value?.includes(option.value)
+                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                          : 'border-gray-200 hover:border-blue-300'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            />
+            {errors.product_sales_channels && (
+              <p className="mt-2 text-sm text-red-600" role="alert">
+                {errors.product_sales_channels?.message?.toString()}
+              </p>
+            )}
+          </div>
       <div>
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">Goals & Style</h2>
-        
-        {/* Goals Selection */}
-        <div className="mb-8">
-          <fieldset>
-            <legend className="block text-sm font-medium text-gray-700 mb-4">
-              Top 3 goals (drag to rank or click to select)
-            </legend>
-            <div className="grid grid-cols-2 gap-3" role="group">
-              {goalOptions.map((goal, index) => (
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Your typical customer buys: *
+            </label>
+            <Controller
+              name="customer_purchase_pattern"
+              control={control}
+              render={({ field }) => (
+                <div className="flex flex-wrap gap-2">
+                  {customerPurchasePatterns.map(option => (
                 <button
-                  key={goal.id}
                   type="button"
-                  aria-pressed={selectedGoals.includes(goal.id)}
-                  onClick={() => toggleGoal(goal.id)}
-                  className={`p-4 rounded-lg border-2 transition-all duration-200 text-left ${
-                    selectedGoals.includes(goal.id)
+                      key={option.value}
+                      onClick={() => field.onChange(option.value)}
+                      className={`px-3 py-2 rounded-full border-2 text-sm transition-all ${
+                        field.value === option.value
                       ? 'border-blue-500 bg-blue-50 text-blue-700'
-                      : 'border-gray-200 hover:border-gray-300'
+                          : 'border-gray-200 hover:border-blue-300'
                   }`}
                 >
-                  <div className="flex items-center space-x-3">
-                    <span className="text-xl">{goal.icon}</span>
-                    <span className="font-medium">{goal.label}</span>
-                    {selectedGoals.includes(goal.id) && (
-                      <span className="ml-auto bg-blue-500 text-white text-xs px-2 py-1 rounded-full">
-                        {selectedGoals.indexOf(goal.id) + 1}
-                      </span>
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            />
+            {errors.customer_purchase_pattern && (
+              <p className="mt-2 text-sm text-red-600" role="alert">
+                {errors.customer_purchase_pattern?.message?.toString()}
+              </p>
                     )}
                   </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Product price range: *
+            </label>
+            <Controller
+              name="product_price_range"
+              control={control}
+              render={({ field }) => (
+                <div className="flex flex-wrap gap-2">
+                  {productPriceRanges.map(option => (
+                    <button
+                      type="button"
+                      key={option.value}
+                      onClick={() => field.onChange(option.value)}
+                      className={`px-3 py-2 rounded-full border-2 text-sm transition-all ${
+                        field.value === option.value
+                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                          : 'border-gray-200 hover:border-blue-300'
+                      }`}
+                    >
+                      {option.label}
                 </button>
               ))}
             </div>
-            <p className="mt-2 text-sm text-gray-500">
-              Selected: {selectedGoals.length}/3
-            </p>
-            {selectedGoals.length === 0 && (
-              <p className="mt-2 text-sm text-red-600">Please select at least 1 goal</p>
+              )}
+            />
+            {errors.product_price_range && (
+              <p className="mt-2 text-sm text-red-600" role="alert">
+                {errors.product_price_range?.message?.toString()}
+              </p>
             )}
-          </fieldset>
+          </div>
         </div>
-
-        {/* Brand Personality */}
-        <div className="mb-8">
-          <fieldset>
-            <legend className="block text-sm font-medium text-gray-700 mb-4">
-              Brand personality (select multiple)
-            </legend>
-            <div className="flex flex-wrap gap-3" role="group">
-              {personalityOptions.map((personality) => (
+      )}
+      {/* Services Section */}
+      {businessOffering === 'services' && (
+        <div className="space-y-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              What type of services do you provide? <span className="text-gray-400">(Select up to 3)</span> *
+            </label>
+            <Controller
+              name="service_types"
+              control={control}
+              render={({ field }) => (
+                <div className="flex flex-wrap gap-2">
+                  {serviceTypes.map(option => (
+                    <button
+                      type="button"
+                      key={option.value}
+                      onClick={() => {
+                        const arr = field.value || [];
+                        if (arr.includes(option.value)) {
+                          field.onChange(arr.filter((v: string) => v !== option.value));
+                        } else if (arr.length < 3) {
+                          field.onChange([...(arr || []), option.value]);
+                        }
+                      }}
+                      className={`px-3 py-2 rounded-full border-2 text-sm transition-all ${
+                        field.value?.includes(option.value)
+                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                          : 'border-gray-200 hover:border-blue-300'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            />
+            {errors.service_types && (
+              <p className="mt-2 text-sm text-red-600" role="alert">
+                {errors.service_types?.message?.toString()}
+              </p>
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              How do you deliver your services? *
+            </label>
+            <Controller
+              name="service_delivery_methods"
+              control={control}
+              render={({ field }) => (
+                <div className="flex flex-wrap gap-2">
+                  {serviceDeliveryMethods.map(option => (
+                    <button
+                      type="button"
+                      key={option.value}
+                      onClick={() => {
+                        const arr = field.value || [];
+                        if (arr.includes(option.value)) {
+                          field.onChange(arr.filter((v: string) => v !== option.value));
+                        } else {
+                          field.onChange([...(arr || []), option.value]);
+                        }
+                      }}
+                      className={`px-3 py-2 rounded-full border-2 text-sm transition-all ${
+                        field.value?.includes(option.value)
+                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                          : 'border-gray-200 hover:border-blue-300'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            />
+            {errors.service_delivery_methods && (
+              <p className="mt-2 text-sm text-red-600" role="alert">
+                {errors.service_delivery_methods?.message?.toString()}
+              </p>
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Your typical service engagement: *
+            </label>
+            <Controller
+              name="service_engagement_type"
+              control={control}
+              render={({ field }) => (
+                <div className="flex flex-wrap gap-2">
+                  {serviceEngagementTypes.map(option => (
+                    <button
+                      type="button"
+                      key={option.value}
+                      onClick={() => field.onChange(option.value)}
+                      className={`px-3 py-2 rounded-full border-2 text-sm transition-all ${
+                        field.value === option.value
+                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                          : 'border-gray-200 hover:border-blue-300'
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+            />
+            {errors.service_engagement_type && (
+              <p className="mt-2 text-sm text-red-600" role="alert">
+                {errors.service_engagement_type?.message?.toString()}
+              </p>
+            )}
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Service price range: *
+            </label>
+            <Controller
+              name="service_price_range"
+              control={control}
+              render={({ field }) => (
+                <div className="flex flex-wrap gap-2">
+                  {servicePriceRanges.map(option => (
                 <button
-                  key={personality.id}
                   type="button"
-                  aria-pressed={selectedPersonality.includes(personality.id)}
-                  onClick={() => togglePersonality(personality.id)}
-                  className={`px-4 py-2 rounded-full border-2 transition-all duration-200 ${
-                    selectedPersonality.includes(personality.id)
+                      key={option.value}
+                      onClick={() => field.onChange(option.value)}
+                      className={`px-3 py-2 rounded-full border-2 text-sm transition-all ${
+                        field.value === option.value
                       ? 'border-blue-500 bg-blue-50 text-blue-700'
-                      : 'border-gray-200 hover:border-gray-300'
+                          : 'border-gray-200 hover:border-blue-300'
                   }`}
                 >
-                  <span className="mr-2">{personality.icon}</span>
-                  {personality.label}
+                      {option.label}
                 </button>
               ))}
             </div>
-            {selectedPersonality.length === 0 && (
-              <p className="mt-2 text-sm text-red-600">Please select at least 1 personality trait</p>
+              )}
+            />
+            {errors.service_price_range && (
+              <p className="mt-2 text-sm text-red-600" role="alert">
+                {errors.service_price_range?.message?.toString()}
+              </p>
             )}
-          </fieldset>
+          </div>
         </div>
-
-        {/* Social Media Presence */}
-        <div className="mb-8">
-          <fieldset>
-            <legend className="block text-sm font-medium text-gray-700 mb-4">
-              Current social media presence
-            </legend>
-            <div className="space-y-4">
-              {[
-                { platform: 'facebook', label: 'Facebook', icon: '📘' },
-                { platform: 'instagram', label: 'Instagram', icon: '📷' },
-                { platform: 'linkedin', label: 'LinkedIn', icon: '💼' },
-              ].map(({ platform, label, icon }) => (
-                <fieldset key={platform} className="flex items-center space-x-4">
-                  <legend className="flex items-center space-x-2 w-32 mb-0">
-                    <span>{icon}</span>
-                    <span className="font-medium">{label}:</span>
-                  </legend>
-                  <div className="flex space-x-2" role="radiogroup" aria-label={label}>
-                    {['none', 'some', 'active'].map((level) => (
+      )}
+      {/* Both: Show all */}
+      {businessOffering === 'both' && (
+        <>
+          <div className="space-y-6">
+            {/* Product questions */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                What type of products do you sell? <span className="text-gray-400">(Select up to 3)</span> *
+              </label>
+              <Controller
+                name="product_types"
+                control={control}
+                render={({ field }) => (
+                  <div className="flex flex-wrap gap-2">
+                    {productTypes.map(option => (
                       <button
-                        key={level}
                         type="button"
-                        role="radio"
-                        aria-checked={socialMedia[platform as keyof typeof socialMedia] === level}
-                        aria-label={level}
-                        onClick={() => updateSocialMedia(platform, level)}
-                        className={`px-3 py-1 rounded-full text-sm capitalize transition-all duration-200 ${
-                          socialMedia[platform as keyof typeof socialMedia] === level
-                            ? level === 'none' ? 'bg-gray-100 text-gray-700 border-2 border-gray-300'
-                              : level === 'some' ? 'bg-yellow-100 text-yellow-700 border-2 border-yellow-300'
-                              : 'bg-green-100 text-green-700 border-2 border-green-300'
-                            : 'bg-gray-50 text-gray-500 border-2 border-gray-200 hover:border-gray-300'
+                        key={option.value}
+                        onClick={() => {
+                          const arr = field.value || [];
+                          if (arr.includes(option.value)) {
+                            field.onChange(arr.filter((v: string) => v !== option.value));
+                          } else if (arr.length < 3) {
+                            field.onChange([...(arr || []), option.value]);
+                          }
+                        }}
+                        className={`px-3 py-2 rounded-full border-2 text-sm transition-all ${
+                          field.value?.includes(option.value)
+                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                            : 'border-gray-200 hover:border-blue-300'
                         }`}
                       >
-                        {level === 'none' ? '⚪' : level === 'some' ? '🟡' : '🟢'} {level}
+                        {option.label}
                       </button>
                     ))}
                   </div>
-                </fieldset>
-              ))}
+                )}
+              />
+              {errors.product_types && (
+                <p className="mt-2 text-sm text-red-600" role="alert">
+                  {errors.product_types?.message?.toString()}
+                </p>
+              )}
             </div>
-          </fieldset>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Where do customers buy your products? *
+              </label>
+              <Controller
+                name="product_sales_channels"
+                control={control}
+                render={({ field }) => (
+                  <div className="flex flex-wrap gap-2">
+                    {productSalesChannels.map(option => (
+                      <button
+                        type="button"
+                        key={option.value}
+                        onClick={() => {
+                          const arr = field.value || [];
+                          if (arr.includes(option.value)) {
+                            field.onChange(arr.filter((v: string) => v !== option.value));
+                          } else {
+                            field.onChange([...(arr || []), option.value]);
+                          }
+                        }}
+                        className={`px-3 py-2 rounded-full border-2 text-sm transition-all ${
+                          field.value?.includes(option.value)
+                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                            : 'border-gray-200 hover:border-blue-300'
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              />
+              {errors.product_sales_channels && (
+                <p className="mt-2 text-sm text-red-600" role="alert">
+                  {errors.product_sales_channels?.message?.toString()}
+                </p>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Your typical customer buys: *
+              </label>
+              <Controller
+                name="customer_purchase_pattern"
+                control={control}
+                render={({ field }) => (
+                  <div className="flex flex-wrap gap-2">
+                    {customerPurchasePatterns.map(option => (
+                      <button
+                        type="button"
+                        key={option.value}
+                        onClick={() => field.onChange(option.value)}
+                        className={`px-3 py-2 rounded-full border-2 text-sm transition-all ${
+                          field.value === option.value
+                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                            : 'border-gray-200 hover:border-blue-300'
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              />
+              {errors.customer_purchase_pattern && (
+                <p className="mt-2 text-sm text-red-600" role="alert">
+                  {errors.customer_purchase_pattern?.message?.toString()}
+                </p>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Product price range: *
+              </label>
+              <Controller
+                name="product_price_range"
+                control={control}
+                render={({ field }) => (
+                  <div className="flex flex-wrap gap-2">
+                    {productPriceRanges.map(option => (
+                      <button
+                        type="button"
+                        key={option.value}
+                        onClick={() => field.onChange(option.value)}
+                        className={`px-3 py-2 rounded-full border-2 text-sm transition-all ${
+                          field.value === option.value
+                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                            : 'border-gray-200 hover:border-blue-300'
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              />
+              {errors.product_price_range && (
+                <p className="mt-2 text-sm text-red-600" role="alert">
+                  {errors.product_price_range?.message?.toString()}
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="space-y-6 mt-8">
+            {/* Service questions */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                What type of services do you provide? <span className="text-gray-400">(Select up to 3)</span> *
+              </label>
+              <Controller
+                name="service_types"
+                control={control}
+                render={({ field }) => (
+                  <div className="flex flex-wrap gap-2">
+                    {serviceTypes.map(option => (
+                      <button
+                        type="button"
+                        key={option.value}
+                        onClick={() => {
+                          const arr = field.value || [];
+                          if (arr.includes(option.value)) {
+                            field.onChange(arr.filter((v: string) => v !== option.value));
+                          } else if (arr.length < 3) {
+                            field.onChange([...(arr || []), option.value]);
+                          }
+                        }}
+                        className={`px-3 py-2 rounded-full border-2 text-sm transition-all ${
+                          field.value?.includes(option.value)
+                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                            : 'border-gray-200 hover:border-blue-300'
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              />
+              {errors.service_types && (
+                <p className="mt-2 text-sm text-red-600" role="alert">
+                  {errors.service_types?.message?.toString()}
+                </p>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                How do you deliver your services? *
+              </label>
+              <Controller
+                name="service_delivery_methods"
+                control={control}
+                render={({ field }) => (
+                  <div className="flex flex-wrap gap-2">
+                    {serviceDeliveryMethods.map(option => (
+                      <button
+                        type="button"
+                        key={option.value}
+                        onClick={() => {
+                          const arr = field.value || [];
+                          if (arr.includes(option.value)) {
+                            field.onChange(arr.filter((v: string) => v !== option.value));
+                          } else {
+                            field.onChange([...(arr || []), option.value]);
+                          }
+                        }}
+                        className={`px-3 py-2 rounded-full border-2 text-sm transition-all ${
+                          field.value?.includes(option.value)
+                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                            : 'border-gray-200 hover:border-blue-300'
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              />
+              {errors.service_delivery_methods && (
+                <p className="mt-2 text-sm text-red-600" role="alert">
+                  {errors.service_delivery_methods?.message?.toString()}
+                </p>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Your typical service engagement: *
+              </label>
+              <Controller
+                name="service_engagement_type"
+                control={control}
+                render={({ field }) => (
+                  <div className="flex flex-wrap gap-2">
+                    {serviceEngagementTypes.map(option => (
+                      <button
+                        type="button"
+                        key={option.value}
+                        onClick={() => field.onChange(option.value)}
+                        className={`px-3 py-2 rounded-full border-2 text-sm transition-all ${
+                          field.value === option.value
+                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                            : 'border-gray-200 hover:border-blue-300'
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              />
+              {errors.service_engagement_type && (
+                <p className="mt-2 text-sm text-red-600" role="alert">
+                  {errors.service_engagement_type?.message?.toString()}
+                </p>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Service price range: *
+              </label>
+              <Controller
+                name="service_price_range"
+                control={control}
+                render={({ field }) => (
+                  <div className="flex flex-wrap gap-2">
+                    {servicePriceRanges.map(option => (
+                      <button
+                        type="button"
+                        key={option.value}
+                        onClick={() => field.onChange(option.value)}
+                        className={`px-3 py-2 rounded-full border-2 text-sm transition-all ${
+                          field.value === option.value
+                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                            : 'border-gray-200 hover:border-blue-300'
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              />
+              {errors.service_price_range && (
+                <p className="mt-2 text-sm text-red-600" role="alert">
+                  {errors.service_price_range?.message?.toString()}
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="space-y-6 mt-8">
+            {/* Both: Primary Focus & Connection */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                What's your primary focus?
+              </label>
+              <Controller
+                name="primary_focus"
+                control={control}
+                render={({ field }) => (
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    step={1}
+                    value={field.value === 'mostly_products' ? 0 : field.value === 'mostly_services' ? 100 : 50}
+                    onChange={e => field.onChange(e.target.value)}
+                    className="w-full"
+                  />
+                )}
+              />
+              <div className="flex justify-between text-xs text-gray-500 mt-1">
+                <span>📦 Mostly Products</span>
+                <span>🛠️ Mostly Services</span>
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                How do products and services connect?
+              </label>
+              <Controller
+                name="products_services_connection"
+                control={control}
+                render={({ field }) => (
+                  <div className="flex flex-wrap gap-2">
+                    {productsServicesConnections.map(option => (
+                      <button
+                        type="button"
+                        key={option.value}
+                        onClick={() => field.onChange(option.value)}
+                        className={`px-3 py-2 rounded-full border-2 text-sm transition-all ${
+                          field.value === option.value
+                            ? 'border-blue-500 bg-blue-50 text-blue-700'
+                            : 'border-gray-200 hover:border-blue-300'
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              />
+              {errors.products_services_connection && (
+                <p className="mt-2 text-sm text-red-600" role="alert">
+                  {errors.products_services_connection?.message?.toString()}
+                </p>
+              )}
         </div>
       </div>
-
+        </>
+      )}
       <div className="flex justify-between">
         <button
           type="button"
@@ -228,7 +786,12 @@ export const Step2GoalsStyle = ({ data, onNext, onBack }: Step2Props) => {
         </button>
         <button
           type="submit"
-          className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors duration-200"
+          className={`px-6 py-2 rounded-md font-semibold transition-all ${
+            isValid
+              ? 'bg-blue-600 text-white hover:bg-blue-700'
+              : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+          }`}
+          disabled={!isValid}
         >
           Continue
         </button>

@@ -49,7 +49,7 @@ export default clerkMiddleware(async (auth, request) => {
         .from('onboarding')
         .select('clerk_user_id')
         .eq('clerk_user_id', userId)
-        .single();
+        .maybeSingle();
       
       if (error) throw error;
       return onboardingData;

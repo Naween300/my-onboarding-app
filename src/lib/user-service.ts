@@ -52,7 +52,7 @@ export class UserService {
         .from('onboarding')
         .select('*')
         .eq('clerk_user_id', clerkUserId)
-        .single();
+        .maybeSingle();
 
       if (error) {
         console.error('❌ Supabase SELECT error details:', {
@@ -98,7 +98,7 @@ export class UserService {
           updated_at: new Date().toISOString()
         })
         .select()
-        .single()
+        .maybeSingle()
 
       return { data, error }
     } catch (error) {

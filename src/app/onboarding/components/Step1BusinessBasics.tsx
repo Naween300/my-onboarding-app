@@ -5,6 +5,28 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { step1Schema } from '@/lib/validations';
 import { BusinessType, OnboardingData } from '@/lib/types';
 
+// Enhanced onboarding options
+const idealCustomerOptions = [
+  { value: 'business_owners', label: '👔 Business owners' },
+  { value: 'marketing_managers', label: '🎯 Marketing managers' },
+  { value: 'individual_consumers', label: '👥 Individual consumers' },
+  { value: 'large_corporations', label: '🏢 Large corporations' },
+  { value: 'startups', label: '🚀 Startups' },
+  { value: 'professionals', label: '👨‍💼 Professionals' },
+  { value: 'students', label: '👩‍🎓 Students' },
+  { value: 'families', label: '👪 Families' },
+  { value: 'homeowners', label: '🏠 Homeowners' },
+  { value: 'freelancers', label: '💼 Freelancers' },
+];
+const mainBusinessGoals = [
+  { value: 'grow_customer_base', label: '📈 Grow customer base' },
+  { value: 'increase_revenue', label: '💰 Increase revenue' },
+  { value: 'build_brand_awareness', label: '🌟 Build brand awareness' },
+  { value: 'launch_new_product', label: '🎯 Launch new product/service' },
+  { value: 'improve_retention', label: '🔄 Improve customer retention' },
+  { value: 'scale_operations', label: '🚀 Scale operations' },
+];
+
 const businessTypes: BusinessType[] = [
   { id: 'restaurant', name: 'Restaurant/Food', icon: '🍽️', category: 'food' },
   { id: 'retail', name: 'Retail/Store', icon: '🛍️', category: 'retail' },
@@ -21,6 +43,13 @@ const businessTypes: BusinessType[] = [
   { id: 'travel', name: 'Travel/Tourism', icon: '✈️', category: 'travel' },
   { id: 'beauty', name: 'Beauty/Fashion', icon: '💄', category: 'beauty' },
   { id: 'entertainment', name: 'Entertainment', icon: '🎬', category: 'entertainment' },
+];
+
+// Add at the top: What do you offer?
+const offeringOptions = [
+  { value: 'products', label: '📦 Products', description: 'Physical/digital items customers buy' },
+  { value: 'services', label: '🛠️ Services', description: 'Work you do for customers' },
+  { value: 'both', label: '🔄 Both', description: 'Products and services combined' },
 ];
 
 interface Step1Props {
@@ -42,11 +71,11 @@ export const Step1BusinessBasics = ({ data, onNext }: Step1Props) => {
     mode: 'onChange',
     reValidateMode: 'onChange',
     defaultValues: {
+      business_offering: data.business_offering || 'products',
       businessType: data.businessType || '',
       businessName: data.businessName || '',
       locationType: data.locationType || 'online',
       location: data.location || '',
-      customerType: data.customerType || 'b2c'
     },
   });
 
@@ -69,19 +98,42 @@ export const Step1BusinessBasics = ({ data, onNext }: Step1Props) => {
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
       <div>
         <h2 className="text-2xl font-bold text-gray-900 mb-6">Business Basics</h2>
-        
-        {/* Debug Panel */}
-        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <h4 className="font-semibold text-blue-800 mb-2">🔧 Live Debug:</h4>
-          <div className="text-sm text-blue-700 space-y-1">
-            <p><strong>Business Type:</strong> "{formValues.businessType}"</p>
-            <p><strong>Business Name:</strong> "{formValues.businessName}" (Length: {formValues.businessName?.length || 0})</p>
-            <p><strong>Form Valid:</strong> {isValid ? '✅ YES' : '❌ NO'}</p>
-            <p><strong>Errors:</strong> {Object.keys(errors).length}</p>
-          </div>
+        {/* --- What do you offer? --- */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-2">
+            What do you offer? *
+          </label>
+          <Controller
+            name="business_offering"
+            control={control}
+            rules={{ required: true }}
+            render={({ field }) => (
+              <div className="flex gap-4">
+                {offeringOptions.map((option) => (
+                  <button
+                    type="button"
+                    key={option.value}
+                    onClick={() => field.onChange(option.value)}
+                    className={`flex-1 p-4 rounded-lg border-2 transition-all text-left ${
+                      field.value === option.value
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-gray-200 hover:border-blue-300'
+                    }`}
+                  >
+                    <div className="text-xl mb-1">{option.label}</div>
+                    <div className="text-xs text-gray-500">{option.description}</div>
+                  </button>
+                ))}
+              </div>
+            )}
+          />
+          {errors.business_offering && (
+            <p className="mt-2 text-sm text-red-600" role="alert">
+              ⚠️ Please select what you offer.
+            </p>
+          )}
         </div>
-
-        {/* ✅ FIXED: Business Type with hidden input for React Hook Form */}
+        {/* --- What's your business? (business type grid) --- */}
         <div className="mb-6">
           <fieldset>
             <legend id="business-type-legend" className="block text-sm font-medium text-gray-700 mb-4">
@@ -90,7 +142,6 @@ export const Step1BusinessBasics = ({ data, onNext }: Step1Props) => {
                 (Selected: {formValues.businessType || 'None'})
               </span>
             </legend>
-            {/* ✅ ADD: Hidden input for React Hook Form registration */}
             <input
               {...register('businessType')}
               type="hidden"
@@ -128,8 +179,7 @@ export const Step1BusinessBasics = ({ data, onNext }: Step1Props) => {
             )}
           </fieldset>
         </div>
-
-        {/* Business Name - Standard input registration */}
+        {/* --- Business Name --- */}
         <div className="mb-6">
           <label htmlFor="businessName" className="block text-sm font-medium text-gray-700 mb-2">
             Business Name *
@@ -149,8 +199,7 @@ export const Step1BusinessBasics = ({ data, onNext }: Step1Props) => {
             </p>
           )}
         </div>
-
-        {/* ✅ FIXED: Location Type with proper fieldset */}
+        {/* --- Location --- */}
         <div className="mb-6">
           <fieldset>
             <legend className="block text-sm font-medium text-gray-700 mb-4">
@@ -196,7 +245,6 @@ export const Step1BusinessBasics = ({ data, onNext }: Step1Props) => {
             />
           </fieldset>
         </div>
-
         {/* Location Input for Local */}
         {formValues.locationType === 'local' && (
           <div className="mb-6">
@@ -219,50 +267,6 @@ export const Step1BusinessBasics = ({ data, onNext }: Step1Props) => {
             )}
           </div>
         )}
-
-        {/* ✅ FIXED: Customer Type with proper fieldset */}
-        <div className="mb-6">
-          <fieldset>
-            <legend className="block text-sm font-medium text-gray-700 mb-4">
-              You serve *
-            </legend>
-            <Controller
-              name="customerType"
-              control={control}
-              render={({ field }) => (
-                <div className="grid grid-cols-3 gap-4" role="radiogroup">
-                  {[
-                    { value: 'b2b', label: 'Businesses (B2B)', icon: '🏢' },
-                    { value: 'b2c', label: 'Consumers (B2C)', icon: '👥' },
-                    { value: 'both', label: 'Both', icon: '🔄' },
-                  ].map((option) => (
-                    <button
-                      key={option.value}
-                      type="button"
-                      role="radio"
-                      aria-checked={field.value === option.value}
-                      aria-label={option.label}
-                      onClick={() => field.onChange(option.value)}
-                      className={`p-4 rounded-lg border-2 transition-all duration-200 text-center ${
-                        field.value === option.value
-                          ? 'border-blue-500 bg-blue-50 text-blue-700'
-                          : 'border-gray-200 hover:border-gray-300'
-                      }`}
-                    >
-                      <div className="text-xl mb-2">{option.icon}</div>
-                      <div className="font-medium text-sm">{option.label}</div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            />
-            {errors.customerType && (
-              <p className="mt-2 text-sm text-red-600" role="alert">
-                ⚠️ {errors.customerType.message}
-              </p>
-            )}
-          </fieldset>
-        </div>
       </div>
 
       <div className="flex justify-end">

@@ -1,5 +1,6 @@
 import { StrategySelector } from './strategy-selector';
 import { OnboardingData } from './types';
+import { createClient } from '@supabase/supabase-js';
 
 export class StrategyService {
   private supabase;
@@ -9,57 +10,75 @@ export class StrategyService {
     this.supabase = supabaseClient;
   }
 
-  async assignStrategyToUser(userId: string): Promise<string> {
+  static async assignStrategyToUser(userId: string) {
     try {
-      console.log('🎯 Assigning strategy to user:', userId);
+      console.log('🔍 StrategyService: Looking for onboarding data for user:', userId);
+      
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY!
+      );
 
-      const { data: onboardingData, error: onboardingError } = await this.supabase
-        .from('onboarding')
+      // Query the enhanced onboarding table with proper error handling
+      const { data: onboardingData, error } = await supabase
+        .from('user_enhanced_onboarding')
         .select('*')
         .eq('clerk_user_id', userId)
+        .eq('is_completed', true)
         .single();
 
-      console.log('🔍 Query result:', { data: !!onboardingData, error: onboardingError });
+      console.log('📊 StrategyService: Query result:', { 
+        found: !!onboardingData, 
+        error: error?.message,
+        userId 
+      });
 
-      if (onboardingError) {
-        console.error('❌ Database query error:', onboardingError);
-        throw new Error(`Database access failed: ${onboardingError.message}`);
+      if (error) {
+        if (error.code === 'PGRST116') {
+          console.error('❌ StrategyService: No onboarding data found for user:', userId);
+          throw new Error(`Onboarding data not found for user: ${userId}`);
+        }
+        throw new Error(`Database error: ${error.message}`);
       }
 
       if (!onboardingData) {
         throw new Error('Onboarding data not found in database');
       }
 
-      console.log('✅ Onboarding data found, proceeding with strategy assignment');
+      console.log('✅ StrategyService: Onboarding data found:', onboardingData);
 
-      const strategyScores = this.strategySelector.selectStrategy(onboardingData);
-      const topStrategy = strategyScores[0];
-
-      console.log('✅ Top strategy selected:', topStrategy);
-
-      const { error: assignmentError } = await this.supabase
-        .from('user_strategy_assignments')
-        .upsert({
-          clerk_user_id: userId,
-          strategy_id: topStrategy.strategyId,
-          strategy_name: topStrategy.strategyName,
-          assigned_score: topStrategy.score,
-          assignment_reasoning: topStrategy.reasoning,
-          is_active: true,
-          manually_overridden: false
-        }, {
-          onConflict: 'clerk_user_id'
-        });
-
-      if (assignmentError) {
-        throw new Error(`Failed to save strategy: ${assignmentError.message}`);
-      }
-
-      return topStrategy.strategyId;
+      // Generate strategy based on onboarding data
+      const strategy = this.generateStrategy(onboardingData);
+      
+      return strategy;
     } catch (error) {
-      console.error('❌ Strategy assignment error:', error);
+      console.error('❌ StrategyService error:', error);
       throw error;
     }
+  }
+
+  private static generateStrategy(onboardingData: any) {
+    // Your strategy generation logic based on onboarding data
+    return {
+      businessType: onboardingData.business_category,
+      targetAudience: onboardingData.ideal_customers,
+      contentThemes: onboardingData.audience_topics,
+      brandPersonality: onboardingData.brand_personality,
+      primaryGoals: onboardingData.top_goals,
+      recommendedPostingFrequency: this.calculatePostingFrequency(onboardingData),
+      contentStrategy: this.buildContentStrategy(onboardingData)
+    };
+  }
+
+  // Placeholder methods for strategy generation
+  private static calculatePostingFrequency(onboardingData: any) {
+    // Implement your logic
+    return '3x per week';
+  }
+
+  private static buildContentStrategy(onboardingData: any) {
+    // Implement your logic
+    return ['Educational', 'Promotional', 'Engagement'];
   }
 
   async getUserStrategy(userId: string) {
@@ -71,7 +90,7 @@ export class StrategyService {
         .eq('is_active', true)
         .order('assigned_at', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
 
       if (error || !data) {
         return null;
