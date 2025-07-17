@@ -7,41 +7,64 @@ export const supabase = createClient(supabaseUrl, supabaseKey)
 
 // Database record type (matches your table structure)
 export interface OnboardingRecord {
-  id?: string
-  
+  id?: string;
+
   // Step 1: Business Basics
-  business_type: string
-  business_name: string
-  location_type: 'local' | 'online'
-  location?: string
-  customer_type: 'b2b' | 'b2c' | 'both'
-  
+  business_offering: 'products' | 'services' | 'both';
+  business_category: string;
+  business_name: string;
+  location_type: 'local' | 'online';
+  location_details?: string;
+
   // Step 2: Goals & Style
-  goals: string[] // Array of goal IDs
-  brand_personality: string[] // Array of personality trait IDs
-  social_media_presence: {
-    facebook: 'none' | 'some' | 'active'
-    instagram: 'none' | 'some' | 'active'
-    linkedin: 'none' | 'some' | 'active'
-  }
-  
-  // Step 3: Brand Setup
-  logo_file_name?: string
-  brand_colors: {
-    primary: string
-    secondary: string
-  }
-  contact_info?: {
-    website?: string
-    phone?: string
-    socialHandles?: string
-  }
-  budget: number
-  timeline: 'quick' | 'steady' | 'long-term'
-  
-  // Metadata
-  created_at?: string
-  updated_at?: string
+  product_types?: string[];
+  product_sales_channels?: string[];
+  customer_purchase_pattern?: string;
+  product_price_range?: string;
+  service_types?: string[];
+  service_delivery_methods?: string[];
+  service_engagement_type?: string;
+  service_price_range?: string;
+  primary_focus?: string;
+  products_services_connection?: string;
+
+  // Step 3: Market & Brand
+  ideal_customers?: string[];
+  customer_biggest_challenge?: string;
+  audience_topics?: string[];
+
+  // Step 4: Goals & Brand Identity
+  top_goals?: string[];
+  primary_business_goal?: string;
+  brand_personality?: string[];
+  differentiators?: string[];
+
+  // Step 5: Brand Setup
+  logo_url?: string;
+  primary_color?: string;
+  secondary_color?: string;
+  website?: string;
+  phone?: string;
+  social_handles?: string;
+  current_social_presence?: {
+    facebook: 'none' | 'some' | 'active';
+    instagram: 'none' | 'some' | 'active';
+    linkedin: 'none' | 'some' | 'active';
+  };
+
+  // Step 6: Optimization/Settings
+  team_size?: 'just_me' | '2_5_members' | '6_20_members' | '20_plus';
+  business_age?: 'less_1_year' | '1_3_years' | '3_10_years' | '10_plus';
+  project_duration?: string;
+  monthly_budget?: number;
+  results_timeline?: string;
+
+  // Progress/Meta
+  onboarding_step?: number;
+  is_completed?: boolean;
+  completion_percentage?: number;
+  completed_at?: string;
+  updated_at?: string;
 }
 
 // Form data type (matches your form structure)

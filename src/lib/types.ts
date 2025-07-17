@@ -1,22 +1,10 @@
 export interface OnboardingData {
-  // Step 1: Business Basics
+  clerk_user_id: string;
   business_offering: 'products' | 'services' | 'both';
-  businessType: string;
-  businessName: string;
-  locationType: 'local' | 'online';
-  location?: string;
-  customerType: 'b2b' | 'b2c' | 'both';
-  
-  // Step 2: Goals & Style
-  goals: string[];
-  brandPersonality: string[];
-  socialMediaPresence: {
-    facebook: 'none' | 'some' | 'active';
-    instagram: 'none' | 'some' | 'active';
-    linkedin: 'none' | 'some' | 'active';
-  };
-  
-  // Step 2: Offering Details (Enhanced)
+  business_category: string;
+  business_name: string;
+  location_type: 'local' | 'online';
+  location_details?: string;
   product_types?: string[];
   product_sales_channels?: string[];
   customer_purchase_pattern?: string;
@@ -27,33 +15,35 @@ export interface OnboardingData {
   service_price_range?: string;
   primary_focus?: string;
   products_services_connection?: string;
-  
-  // Step 3: Brand Setup & Content Personalization (Enhanced)
-  audience_topics?: string[];
-  team_size?: string;
-  business_age?: string;
-  
-  // Step 3: Brand Setup
-  logo?: File;
-  brandColors: {
-    primary: string;
-    secondary: string;
-  };
-  contactInfo: {
-    website: string;
-    phone: string;
-    socialHandles: string;
-  };
-  budget: number;
-  timeline: 'quick' | 'steady' | 'long-term';
-
-  // Step 3: Market Intelligence (Enhanced)
-  customer_type?: string;
+  target_market?: 'b2b' | 'b2c' | 'both';
   ideal_customers?: string[];
   customer_biggest_challenge?: string;
-  customer_biggest_challenge_other?: string;
-  competitors?: Array<{ url: string; description?: string }>;
-  competitors_skipped?: boolean;
+  audience_topics?: string[];
+  top_goals: string[];
+  primary_business_goal: string;
+  brand_personality: string[];
+  differentiators?: string[];
+  logo_url?: string;
+  primary_color?: string;
+  secondary_color?: string;
+  website?: string;
+  phone?: string;
+  social_handles?: string;
+  current_social_presence?: {
+    facebook: 'none' | 'some' | 'active';
+    instagram: 'none' | 'some' | 'active';
+    linkedin: 'none' | 'some' | 'active';
+  };
+  team_size?: 'just_me' | '2_5_members' | '6_20_members' | '20_plus';
+  business_age?: 'less_1_year' | '1_3_years' | '3_10_years' | '10_plus';
+  project_duration?: string;
+  monthly_budget: number;
+  results_timeline?: string;
+  onboarding_step?: number;
+  is_completed?: boolean;
+  completion_percentage?: number;
+  completed_at?: string;
+  updated_at?: string;
 }
 
 // Add this alias for compatibility
@@ -64,4 +54,40 @@ export interface BusinessType {
   name: string;
   icon: string;
   category: string;
+}
+
+export interface DecisionCriteria {
+  industry?: string[];
+  businessOffering?: string[];
+  targetMarket?: string[];
+  locationType?: string[];
+  goals?: string[];
+  primaryGoal?: string[];
+  businessAge?: string[];
+  teamSize?: string[];
+  budgetRange?: { min: number; max: number };
+}
+
+export interface StrategyTemplate {
+  id: string;
+  name: string;
+  description: string;
+  postingFrequency: number;
+  complexity: 'low' | 'medium' | 'high';
+  decisionCriteria: DecisionCriteria;
+  resources?: {
+    suitableTeamSizes?: string[];
+    minBudget?: number;
+    maxBudget?: number;
+  };
+  contentPillars?: string[];
+  contentMix?: { [key: string]: number };
+  platformPriority: string[];
+}
+
+export interface StrategyScore {
+  strategyId: string;
+  strategyName: string;
+  score: number;
+  reasoning: string[];
 }

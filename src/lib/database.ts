@@ -31,65 +31,121 @@ export class DatabaseService {
   // ✅ FIXED: Convert OnboardingData to database format with proper validation
   private static transformToDbFormat(data: Partial<OnboardingData>): Partial<OnboardingRecord> {
     // Validate required fields first
-    if (!data.businessType || !data.businessName) {
-      throw new Error(`Missing required fields: businessType=${data.businessType}, businessName=${data.businessName}`);
+    if (!data.business_offering || !data.business_category || !data.business_name || !data.location_type) {
+      throw new Error(`Missing required fields: business_offering=${data.business_offering}, business_category=${data.business_category}, business_name=${data.business_name}, location_type=${data.location_type}`);
     }
 
     return {
-      // Step 1: Business Basics (Required fields)
-      business_type: data.businessType,
-      business_name: data.businessName,
-      location_type: data.locationType || 'online',
-      location: data.location || '', // Use null instead of undefined
-      customer_type: data.customerType || 'b2c',
-      
-      // Step 2: Goals & Style (Required JSONB fields)
-      goals: data.goals || [],
-      brand_personality: data.brandPersonality || [],
-      social_media_presence: data.socialMediaPresence || {
-        facebook: 'none',
-        instagram: 'none',
-        linkedin: 'none'
-      },
-      
-      // Step 3: Brand Setup (Required fields)
-      brand_colors: data.brandColors || {
-        primary: '#3B82F6',
-        secondary: '#EF4444'
-      },
-      contact_info: data.contactInfo || undefined, // Use null for optional JSONB
-      budget: data.budget || 500,
-      timeline: data.timeline || 'steady'
-    }
+      // Step 1: Business Basics
+      business_offering: data.business_offering,
+      business_category: data.business_category,
+      business_name: data.business_name,
+      location_type: data.location_type,
+      location_details: data.location_details || '',
+
+      // Step 2: Goals & Style
+      product_types: data.product_types || [],
+      product_sales_channels: data.product_sales_channels || [],
+      customer_purchase_pattern: data.customer_purchase_pattern || '',
+      product_price_range: data.product_price_range || '',
+      service_types: data.service_types || [],
+      service_delivery_methods: data.service_delivery_methods || [],
+      service_engagement_type: data.service_engagement_type || '',
+      service_price_range: data.service_price_range || '',
+      primary_focus: data.primary_focus || '',
+      products_services_connection: data.products_services_connection || '',
+
+      // Step 3: Market & Brand
+      ideal_customers: data.ideal_customers || [],
+      customer_biggest_challenge: data.customer_biggest_challenge || '',
+      audience_topics: data.audience_topics || [],
+
+      // Step 4: Goals & Brand Identity
+      top_goals: data.top_goals || [],
+      primary_business_goal: data.primary_business_goal || '',
+      brand_personality: data.brand_personality || [],
+      differentiators: data.differentiators || [],
+
+      // Step 5: Brand Setup
+      logo_url: data.logo_url || '',
+      primary_color: data.primary_color || '#3B82F6',
+      secondary_color: data.secondary_color || '#EF4444',
+      website: data.website || '',
+      phone: data.phone || '',
+      social_handles: data.social_handles || '',
+      current_social_presence: data.current_social_presence || { facebook: 'none', instagram: 'none', linkedin: 'none' },
+
+      // Step 6: Optimization/Settings
+      team_size: data.team_size || 'just_me',
+      business_age: data.business_age || 'less_1_year',
+      project_duration: data.project_duration || 'same_day',
+      monthly_budget: data.monthly_budget || 500,
+      results_timeline: data.results_timeline || '',
+
+      // Progress/Meta
+      onboarding_step: data.onboarding_step || 1,
+      is_completed: data.is_completed || false,
+      completion_percentage: data.completion_percentage || 0,
+      completed_at: data.is_completed ? new Date().toISOString() : '',
+      updated_at: new Date().toISOString(),
+    };
   }
 
-  // Convert database format back to OnboardingData format
   private static transformFromDbFormat(data: OnboardingRecord): Partial<OnboardingData> {
     return {
       // Step 1
-      businessType: data.business_type,
-      businessName: data.business_name,
-      locationType: data.location_type,
-      location: data.location,
-      customerType: data.customer_type,
-      
+      business_offering: data.business_offering,
+      business_category: data.business_category,
+      business_name: data.business_name,
+      location_type: data.location_type,
+      location_details: data.location_details,
+
       // Step 2
-      goals: data.goals,
-      brandPersonality: data.brand_personality,
-      socialMediaPresence: data.social_media_presence,
-      
+      product_types: data.product_types,
+      product_sales_channels: data.product_sales_channels,
+      customer_purchase_pattern: data.customer_purchase_pattern,
+      product_price_range: data.product_price_range,
+      service_types: data.service_types,
+      service_delivery_methods: data.service_delivery_methods,
+      service_engagement_type: data.service_engagement_type,
+      service_price_range: data.service_price_range,
+      primary_focus: data.primary_focus,
+      products_services_connection: data.products_services_connection,
+
       // Step 3
-      brandColors: data.brand_colors,
-      contactInfo: data.contact_info
-        ? {
-            website: data.contact_info.website ?? '',
-            phone: data.contact_info.phone ?? '',
-            socialHandles: data.contact_info.socialHandles ?? '',
-          }
-        : { website: '', phone: '', socialHandles: '' },
-      budget: data.budget,
-      timeline: data.timeline
-    }
+      ideal_customers: data.ideal_customers,
+      customer_biggest_challenge: data.customer_biggest_challenge,
+      audience_topics: data.audience_topics,
+
+      // Step 4
+      top_goals: data.top_goals,
+      primary_business_goal: data.primary_business_goal,
+      brand_personality: data.brand_personality,
+      differentiators: data.differentiators,
+
+      // Step 5
+      logo_url: data.logo_url,
+      primary_color: data.primary_color,
+      secondary_color: data.secondary_color,
+      website: data.website,
+      phone: data.phone,
+      social_handles: data.social_handles,
+      current_social_presence: data.current_social_presence,
+
+      // Step 6
+      team_size: data.team_size,
+      business_age: data.business_age,
+      project_duration: data.project_duration,
+      monthly_budget: data.monthly_budget,
+      results_timeline: data.results_timeline,
+
+      // Progress/Meta
+      onboarding_step: data.onboarding_step,
+      is_completed: data.is_completed,
+      completion_percentage: data.completion_percentage,
+      completed_at: data.is_completed ? new Date().toISOString() : '',
+      updated_at: new Date().toISOString(),
+    };
   }
 
   // ✅ ENHANCED: Better validation and error handling
@@ -101,8 +157,8 @@ export class DatabaseService {
       console.log('💾 Attempting to save onboarding data:', data)
       
       // Validate required fields before transformation
-      if (!data.businessType || !data.businessName) {
-        const error = new Error(`Missing required fields: businessType="${data.businessType}", businessName="${data.businessName}"`);
+      if (!data.business_offering || !data.business_category || !data.business_name || !data.location_type) {
+        const error = new Error(`Missing required fields: business_offering="${data.business_offering}", business_category="${data.business_category}", business_name="${data.business_name}", location_type="${data.location_type}"`);
         console.error('❌ Validation error:', error.message);
         return { data: null, error };
       }
@@ -110,7 +166,7 @@ export class DatabaseService {
       const dbData = this.transformToDbFormat(data)
       
       if (logoFileName) {
-        dbData.logo_file_name = logoFileName
+        dbData.logo_url = logoFileName
       }
 
       console.log('📝 Transformed data for database:', dbData)
@@ -165,7 +221,7 @@ export class DatabaseService {
       const dbData = this.transformToDbFormat(data)
       
       if (logoFileName) {
-        dbData.logo_file_name = logoFileName
+        dbData.logo_url = logoFileName
       }
 
       console.log('📝 Transformed update data:', dbData)
@@ -302,29 +358,28 @@ export class DatabaseService {
         primary_focus: onboardingData.primary_focus || null,
         products_services_connection: onboardingData.products_services_connection || null,
         // Step 3
-        target_market: onboardingData.target_market,
         ideal_customers: onboardingData.ideal_customers || null,
         customer_biggest_challenge: onboardingData.customer_biggest_challenge || null,
+        customer_biggest_challenge_other: onboardingData.customer_biggest_challenge_other || null,
+        competitors: onboardingData.competitors || null,
+        competitors_skipped: onboardingData.competitors_skipped || false,
         audience_topics: onboardingData.audience_topics || null,
         // Step 4
         top_goals: onboardingData.top_goals || null,
-        primary_business_goal: onboardingData.primary_business_goal || null,
+        main_goal: onboardingData.main_goal || null,
         brand_personality: onboardingData.brand_personality || null,
         differentiators: onboardingData.differentiators || null,
         // Step 5
         logo_url,
-        primary_color: onboardingData.primary_color,
-        secondary_color: onboardingData.secondary_color,
-        website: onboardingData.website,
-        phone: onboardingData.phone,
-        social_handles: onboardingData.social_handles ? JSON.stringify(onboardingData.social_handles) : null,
-        current_social_presence: onboardingData.current_social_presence ? JSON.stringify(onboardingData.current_social_presence) : null,
+        brand_colors: onboardingData.brandColors || { primary: '#3B82F6', secondary: '#EF4444' },
+        contact_info: onboardingData.contactInfo || { website: '', phone: '', socialHandles: '' },
+        social_media_presence: onboardingData.socialMedia || { facebook: 'none', instagram: 'none', linkedin: 'none' },
         // Step 6
-        team_size: onboardingData.team_size,
-        business_age: onboardingData.business_age,
-        project_duration: onboardingData.project_duration,
-        monthly_budget: onboardingData.monthly_budget,
-        results_timeline: onboardingData.results_timeline,
+        team_size: onboardingData.team_size || null,
+        business_age: onboardingData.business_age || null,
+        project_duration: onboardingData.project_duration || null,
+        budget: onboardingData.budget || 500,
+        results_timeline: onboardingData.results_timeline || null,
         // Progress
         onboarding_step: onboardingData.onboarding_step || 1,
         is_completed: onboardingData.is_completed || false,

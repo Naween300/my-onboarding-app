@@ -72,10 +72,11 @@ export const Step1BusinessBasics = ({ data, onNext }: Step1Props) => {
     reValidateMode: 'onChange',
     defaultValues: {
       business_offering: data.business_offering || 'products',
-      businessType: data.businessType || '',
-      businessName: data.businessName || '',
-      locationType: data.locationType || 'online',
-      location: data.location || '',
+      business_category: data.business_category || '',
+      business_name: data.business_name || '',
+      location_type: data.location_type || 'online',
+      location_details: data.location_details || '',
+      // target_market removed
     },
   });
 
@@ -85,13 +86,22 @@ export const Step1BusinessBasics = ({ data, onNext }: Step1Props) => {
     formValues,
     isValid,
     errors,
-    hasBusinessType: !!formValues.businessType,
-    hasBusinessName: !!formValues.businessName,
+    hasBusinessCategory: !!formValues.business_category,
+    hasBusinessName: !!formValues.business_name,
   });
 
   const onSubmit = (formData: any) => {
-    console.log('✅ Form submitted successfully with:', formData);
-    onNext(formData);
+    // Only return unified fields
+    const output = {
+      business_offering: formData.business_offering,
+      business_category: formData.business_category,
+      business_name: formData.business_name,
+      location_type: formData.location_type,
+      location_details: formData.location_type === 'local' ? formData.location_details : '',
+      // target_market removed
+    };
+    console.log('✅ Form submitted successfully with:', output);
+    onNext(output);
   };
 
   return (
@@ -139,15 +149,15 @@ export const Step1BusinessBasics = ({ data, onNext }: Step1Props) => {
             <legend id="business-type-legend" className="block text-sm font-medium text-gray-700 mb-4">
               What's your business? *
               <span className="text-xs text-gray-500 ml-2">
-                (Selected: {formValues.businessType || 'None'})
+                (Selected: {formValues.business_category || 'None'})
               </span>
             </legend>
             <input
-              {...register('businessType')}
+              {...register('business_category')}
               type="hidden"
-              id="businessType"
-              name="businessType"
-              value={formValues.businessType}
+              id="business_category"
+              name="business_category"
+              value={formValues.business_category}
             />
             <div className="grid grid-cols-5 gap-3" role="radiogroup" aria-labelledby="business-type-legend">
               {businessTypes.map((type) => (
@@ -155,14 +165,14 @@ export const Step1BusinessBasics = ({ data, onNext }: Step1Props) => {
                   key={type.id}
                   type="button"
                   role="radio"
-                  aria-checked={formValues.businessType === type.id}
+                  aria-checked={formValues.business_category === type.id}
                   aria-labelledby={`business-type-${type.id}`}
                   onClick={() => {
-                    setValue('businessType', type.id, { shouldValidate: true });
-                    trigger('businessType');
+                    setValue('business_category', type.id, { shouldValidate: true });
+                    trigger('business_category');
                   }}
                   className={`p-4 rounded-lg border-2 transition-all duration-200 text-center hover:shadow-md ${
-                    formValues.businessType === type.id
+                    formValues.business_category === type.id
                       ? 'border-blue-500 bg-blue-50 text-blue-700'
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
@@ -172,30 +182,30 @@ export const Step1BusinessBasics = ({ data, onNext }: Step1Props) => {
                 </button>
               ))}
             </div>
-            {errors.businessType && (
+            {errors.business_category && (
               <p className="mt-2 text-sm text-red-600" role="alert">
-                ⚠️ {errors.businessType.message}
+                ⚠️ {errors.business_category.message}
               </p>
             )}
           </fieldset>
         </div>
         {/* --- Business Name --- */}
         <div className="mb-6">
-          <label htmlFor="businessName" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="business_name" className="block text-sm font-medium text-gray-700 mb-2">
             Business Name *
           </label>
           <input
-            {...register('businessName')}
-            id="businessName"
-            name="businessName"
+            {...register('business_name')}
+            id="business_name"
+            name="business_name"
             type="text"
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             placeholder="Enter your business name"
-            aria-describedby={errors.businessName ? "businessName-error" : undefined}
+            aria-describedby={errors.business_name ? "business_name-error" : undefined}
           />
-          {errors.businessName && (
-            <p id="businessName-error" className="mt-2 text-sm text-red-600" role="alert">
-              ⚠️ {errors.businessName.message}
+          {errors.business_name && (
+            <p id="business_name-error" className="mt-2 text-sm text-red-600" role="alert">
+              ⚠️ {errors.business_name.message}
             </p>
           )}
         </div>
@@ -206,7 +216,7 @@ export const Step1BusinessBasics = ({ data, onNext }: Step1Props) => {
               Location *
             </legend>
             <Controller
-              name="locationType"
+              name="location_type"
               control={control}
               render={({ field }) => (
                 <div className="flex gap-4" role="radiogroup">
@@ -246,27 +256,29 @@ export const Step1BusinessBasics = ({ data, onNext }: Step1Props) => {
           </fieldset>
         </div>
         {/* Location Input for Local */}
-        {formValues.locationType === 'local' && (
+        {formValues.location_type === 'local' && (
           <div className="mb-6">
-            <label htmlFor="location" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="location_details" className="block text-sm font-medium text-gray-700 mb-2">
               City/Location
             </label>
             <input
-              {...register('location')}
-              id="location"
-              name="location"
+              {...register('location_details')}
+              id="location_details"
+              name="location_details"
               type="text"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               placeholder="Enter your city/location"
-              aria-describedby={errors.location ? "location-error" : undefined}
+              aria-describedby={errors.location_details ? "location_details-error" : undefined}
             />
-            {errors.location && (
-              <p id="location-error" className="mt-2 text-sm text-red-600" role="alert">
-                ⚠️ {errors.location.message}
+            {errors.location_details && (
+              <p id="location_details-error" className="mt-2 text-sm text-red-600" role="alert">
+                ⚠️ {errors.location_details.message}
               </p>
             )}
           </div>
         )}
+        {/* --- Target Market --- */}
+        {/* Removed Target Market section as requested */}
       </div>
 
       <div className="flex justify-end">

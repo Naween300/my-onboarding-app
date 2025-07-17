@@ -1,5 +1,6 @@
 import { STRATEGY_TEMPLATES } from './strategy-templates';
 import { StrategySelector } from './strategy-selector';
+import { OnboardingData } from './types';
 
 export const verifyStrategies = () => {
   console.log('🔍 Verifying strategy templates...');
@@ -29,7 +30,7 @@ export const verifyStrategies = () => {
     timeline: 'steady'
   };
   
-  const results = selector.selectStrategy(testData);
+  const results = selector.selectStrategy(testData as unknown as OnboardingData);
   console.log('🎯 Top 3 strategy recommendations:');
   results.slice(0, 3).forEach((result, index) => {
     console.log(`${index + 1}. ${result.strategyName} (Score: ${result.score})`);

@@ -15,6 +15,7 @@ import { Step5BrandSetup } from './Step5BrandSetup';
 import { Step6OptimizationSettings } from './Step6OptimizationSettings';
 import { DatabaseService } from '@/lib/database';
 import { createClient } from '@supabase/supabase-js';
+import { OnboardingData } from '@/lib/types';
 
 export const OnboardingFlow = () => {
   const { user, isLoaded } = useUser();
@@ -22,13 +23,12 @@ export const OnboardingFlow = () => {
   const { data, saveCompleteData, updateData, error: hookError } = useOnboarding();
   const supabase = useSupabase();
   const [currentStep, setCurrentStep] = useState(1);
-  const [formData, setFormData] = useState({
-    business_offering: '',
+  const [formData, setFormData] = useState<Partial<OnboardingData>>({
+    business_offering: 'products',
     business_category: '',
     business_name: '',
     location_type: 'online',
     location_details: '',
-    // Step 2 fields
     product_types: [] as string[],
     product_sales_channels: [] as string[],
     customer_purchase_pattern: '',
@@ -39,28 +39,26 @@ export const OnboardingFlow = () => {
     service_price_range: '',
     primary_focus: '',
     products_services_connection: '',
-    // Step 3 fields
-    customer_type: '',
+    target_market: undefined,
     ideal_customers: [] as string[],
     customer_biggest_challenge: '',
     audience_topics: [] as string[],
-    // Step 4 fields
     top_goals: [] as string[],
-    main_goal: '',
+    primary_business_goal: '',
     brand_personality: [] as string[],
     differentiators: [] as string[],
-    // Step 5 fields
-    brandColors: { primary: '#3B82F6', secondary: '#EF4444' },
-    contactInfo: { website: '', phone: '', social: '', socialHandles: '' },
-    logoFile: null,
-    socialMedia: { facebook: 'none', instagram: 'none', linkedin: 'none' },
-    // Step 6 fields
-    team_size: '',
-    business_age: '',
+    logo_url: '',
+    primary_color: '#3B82F6',
+    secondary_color: '#EF4444',
+    website: '',
+    phone: '',
+    social_handles: '',
+    current_social_presence: { facebook: 'none', instagram: 'none', linkedin: 'none' },
+    team_size: undefined,
+    business_age: undefined,
     project_duration: '',
-    budget: 500,
+    monthly_budget: 500,
     results_timeline: '',
-    // Progress fields (optional)
     onboarding_step: 1,
     is_completed: false,
     completion_percentage: 0,
@@ -108,45 +106,15 @@ export const OnboardingFlow = () => {
     });
   }, [currentStep, user, isLoaded]);
 
-  // Sync form data with hook data
+  // Remove legacy sync logic for businessName/businessType
   useEffect(() => {
-    if (data.businessName && data.businessName !== formData.business_name) {
-      setFormData(prev => ({ ...prev, business_name: data.businessName || '' }));
-    }
-    if (data.businessType && data.businessType !== formData.business_offering) {
-      setFormData(prev => ({ ...prev, business_offering: data.businessType || '' }));
-    }
-  }, [data.businessName, data.businessType]);
+    // No need to sync legacy fields
+  }, []);
 
   // Update hook data when form data changes
   const updateFormDataAndHook = (newData: Partial<typeof formData>) => {
     setFormData(prev => ({ ...prev, ...newData }));
-    
-    // Also update the hook data
-    const hookData = {
-      businessName: newData.business_name || formData.business_name,
-      businessType: newData.business_offering || formData.business_offering,
-      locationType: (newData.location_type || formData.location_type) as 'local' | 'online',
-      location: newData.location_details || formData.location_details,
-      top_goals: newData.top_goals || formData.top_goals,
-      brand_personality: newData.brand_personality || formData.brand_personality,
-      socialMediaPresence: {
-        facebook: formData.socialMedia.facebook as 'none' | 'some' | 'active',
-        instagram: formData.socialMedia.instagram as 'none' | 'some' | 'active',
-        linkedin: formData.socialMedia.linkedin as 'none' | 'some' | 'active'
-      },
-      brandColors: newData.brandColors || formData.brandColors,
-      contactInfo: {
-        website: newData.contactInfo?.website || formData.contactInfo.website,
-        phone: newData.contactInfo?.phone || formData.contactInfo.phone,
-        social: newData.contactInfo?.social || formData.contactInfo.social || '',
-        socialHandles: newData.contactInfo?.socialHandles || formData.contactInfo.socialHandles || ''
-      },
-      budget: newData.budget || formData.budget,
-      results_timeline: newData.results_timeline
-    };
-    
-    updateData(hookData as any);
+    updateData({ ...formData, ...newData });
   };
 
   // Debug panel component
@@ -205,7 +173,7 @@ export const OnboardingFlow = () => {
 
   const handleDragEnd = (result: DropResult) => {
     if (!result.destination) return;
-    const items = Array.from(formData.top_goals);
+    const items = Array.from(formData.top_goals ?? []);
     const [reorderedItem] = items.splice(result.source.index, 1);
     items.splice(result.destination.index, 0, reorderedItem);
     setFormData({ ...formData, top_goals: items });
@@ -237,12 +205,12 @@ export const OnboardingFlow = () => {
           location_type: data.location_type,
           location: data.location_details,
           goals: data.goals,    
-          brand_personality: data.brandPersonality,
-          social_media_presence: data.socialMediaPresence,
-          brand_colors: data.brandColors,
-          contact_info: data.contactInfo,
-          budget: data.budget,
-          timeline: data.timeline,
+          brand_personality: data.brand_personality,
+          social_media_presence: data.current_social_presence,
+          brand_colors: data.brand_colors,
+          contact_info: data.contact_info,
+          budget: data.monthly_budget,
+          timeline: data.results_timeline,
           updated_at: new Date().toISOString()
         }, { onConflict: 'clerk_user_id' });
 
@@ -391,11 +359,10 @@ export const OnboardingFlow = () => {
                     const merged = {
                       ...formData,
                       ...step1Data,
-                      contactInfo: {
-                        website: step1Data.contactInfo?.website ?? formData.contactInfo.website ?? '',
-                        phone: step1Data.contactInfo?.phone ?? formData.contactInfo.phone ?? '',
-                        social: (step1Data.contactInfo && 'social' in step1Data.contactInfo) ? String(step1Data.contactInfo.social) : String(formData.contactInfo.social ?? ''),
-                        socialHandles: step1Data.contactInfo?.socialHandles ?? formData.contactInfo.socialHandles ?? ''
+                      contact_info: {
+                        website: step1Data.website ?? formData.website ?? '',
+                        phone: step1Data.phone ?? formData.phone ?? '',
+                        social_handles: step1Data.social_handles ?? formData.social_handles ?? ''
                       }
                     };
                     handleStepNavigation(2, merged);

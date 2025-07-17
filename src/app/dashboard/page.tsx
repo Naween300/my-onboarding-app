@@ -5,7 +5,6 @@ import { useUser, SignOutButton } from '@clerk/nextjs';
 import { useRouter } from 'next/navigation';
 import { useSearchParams } from 'next/navigation';
 import { UserService } from '@/lib/user-service';
-import ContentGenerationWidget from './components/ContentGenerationWidget';
 import AnalyticsWidget from './components/AnalyticsWidget';
 import TrendingInsightsWidget from './components/TrendingInsightsWidget';
 import { RSSFeedWidget } from '@/components/RSSFeedWidget';
@@ -18,6 +17,7 @@ import { PerformanceWidget } from './components/PerformanceWidget';
 import { StrategyWidget } from './components/StrategyWidget';
 import { DashboardLayout } from '@/components/DashboardLayout';
 import { SimpleSidebar } from '@/components/SimpleSidebar';
+import { ContentGenerationWidget } from '@/components/content-generation/ContentGenerationWidget';
 
 const DashboardContent = dynamic(() => import('./components/DashboardContent'), { 
   ssr: false,
@@ -222,6 +222,9 @@ export default function DashboardPage() {
               </div>
               <div className="lg:col-span-1 xl:col-span-1">
                 <StrategyWidget />
+              </div>
+              <div className="lg:col-span-1 xl:col-span-1">
+                <ContentGenerationWidget />
               </div>
               <div className={`grid gap-6 transition-all duration-300 ${
                 sidebarCollapsed 

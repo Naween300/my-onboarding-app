@@ -30,7 +30,8 @@ export class StrategyService {
       console.log('📊 StrategyService: Query result:', { 
         found: !!onboardingData, 
         error: error?.message,
-        userId 
+        userId,
+        onboardingData
       });
 
       if (error) {
@@ -48,9 +49,31 @@ export class StrategyService {
       console.log('✅ StrategyService: Onboarding data found:', onboardingData);
 
       // Generate strategy based on onboarding data
-      const strategy = this.generateStrategy(onboardingData);
-      
-      return strategy;
+      const selector = new StrategySelector();
+      const allScores = selector.selectStrategy(onboardingData);
+      console.log('🧮 All strategy scores:', allScores);
+      const strategy = allScores[0];
+      console.log('🏆 Selected strategy:', strategy);
+
+      // Enhanced return object
+      const template = selector.getStrategyTemplate(strategy.strategyId);
+      const recommendations = selector.getRecommendationsByBusinessType(onboardingData);
+
+      return {
+        ...strategy,
+        template,
+        onboardingData: {
+          businessCategory: onboardingData.business_category,
+          targetMarket: onboardingData.target_market,
+          businessOffering: onboardingData.business_offering,
+          topGoals: onboardingData.top_goals,
+          brandPersonality: onboardingData.brand_personality,
+          monthlyBudget: onboardingData.monthly_budget,
+          teamSize: onboardingData.team_size,
+          businessAge: onboardingData.business_age,
+        },
+        recommendations,
+      };
     } catch (error) {
       console.error('❌ StrategyService error:', error);
       throw error;

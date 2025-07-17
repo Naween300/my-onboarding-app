@@ -2,10 +2,10 @@ import { z } from 'zod';
 
 export const step1Schema = z.object({
   business_offering: z.enum(['products', 'services', 'both'], { required_error: 'Please select what you offer' }),
-  businessType: z.string().min(1, 'Please select a business type'),
-  businessName: z.string().min(2, 'Business name must be at least 2 characters'),
-  locationType: z.enum(['local', 'online']),
-  location: z.string().optional(),
+  business_category: z.string().min(1, 'Please select a business category'),
+  business_name: z.string().min(2, 'Business name must be at least 2 characters'),
+  location_type: z.enum(['local', 'online']),
+  location_details: z.string().optional(),
 });
 
 export const step2Schema = z.object({
