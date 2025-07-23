@@ -12,7 +12,6 @@ import NoSSR from '@/components/NoSSR';
 import ClientOnly from '@/components/ClientOnly';
 import SafeRender from '@/components/SafeRender';
 import dynamic from 'next/dynamic';
-import { AuthTest } from '@/components/AuthTest';
 import { PerformanceWidget } from './components/PerformanceWidget';
 import { StrategyWidget } from './components/StrategyWidget';
 import { DashboardLayout } from '@/components/DashboardLayout';
@@ -198,7 +197,6 @@ export default function DashboardPage() {
         sidebarCollapsed ? 'ml-16' : 'ml-64'
       }`}>
         <div className="p-6">
-          <AuthTest />
           <ClientOnly fallback={
             <div className="min-h-screen bg-gray-50 flex items-center justify-center" suppressHydrationWarning>
               <div className="text-center" suppressHydrationWarning>
@@ -207,33 +205,34 @@ export default function DashboardPage() {
               </div>
             </div>
           }>
-            <div className={`grid gap-6 transition-all duration-300 ${
-              sidebarCollapsed 
-                ? 'grid-cols-1 xl:grid-cols-4' 
-                : 'grid-cols-1 lg:grid-cols-3'
-            }`}>
-              <div className={`transition-all duration-300 ${
-                sidebarCollapsed ? 'xl:col-span-2' : 'lg:col-span-2'
-              }`}>
-                <RSSFeedWidget userBusinessType={onboardingData?.businessType} />
-              </div>
-              <div className="lg:col-span-1 xl:col-span-1">
-                <TrendingInsightsWidget />
-              </div>
-              <div className="lg:col-span-1 xl:col-span-1">
+            <div className="grid gap-6 transition-all duration-300 grid-cols-1 lg:grid-cols-3">
+              {/* Top row: StrategyWidget (2/3), TrendingInsightsWidget (1/3) */}
+              <div className="lg:col-span-2">
                 <StrategyWidget />
               </div>
-              <div className="lg:col-span-1 xl:col-span-1">
+              <div className="lg:col-span-1">
+                <TrendingInsightsWidget />
+              </div>
+
+              {/* Second row: ContentGenerationWidget (2/3), empty (1/3) */}
+              <div className="lg:col-span-2">
                 <ContentGenerationWidget />
               </div>
-              <div className={`grid gap-6 transition-all duration-300 ${
-                sidebarCollapsed 
-                  ? 'xl:col-span-3 grid-cols-1 md:grid-cols-3' 
-                  : 'lg:col-span-2 grid-cols-1 md:grid-cols-2'
-              }`}>
+              <div className="lg:col-span-1"></div>
+
+              {/* Third row: RSSFeedWidget (full width) */}
+              <div className="lg:col-span-3">
+                <RSSFeedWidget userBusinessType={onboardingData?.businessType} />
+              </div>
+
+              {/* Fourth row: AnalyticsWidget (1/2), PerformanceWidget (1/2) */}
+              <div className="lg:col-span-1">
                 <AnalyticsWidget />
+              </div>
+              <div className="lg:col-span-1">
                 <PerformanceWidget />
               </div>
+              <div className="lg:col-span-1"></div>
             </div>
           </ClientOnly>
         </div>
@@ -241,3 +240,4 @@ export default function DashboardPage() {
     </>
   );
 }
+

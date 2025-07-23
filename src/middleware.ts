@@ -46,9 +46,10 @@ export default clerkMiddleware(async (auth, request) => {
       );
       
       const { data: onboardingData, error } = await supabase
-        .from('onboarding')
-        .select('clerk_user_id')
+        .from('user_enhanced_onboarding')
+        .select('clerk_user_id, is_completed')
         .eq('clerk_user_id', userId)
+        .eq('is_completed', true)
         .maybeSingle();
       
       if (error) throw error;
@@ -64,7 +65,7 @@ export default clerkMiddleware(async (auth, request) => {
     const onboardingData = await performDatabaseCheck();
     
     if (!onboardingData) {
-      console.log('🔄 Redirecting to onboarding - not found in database');
+      console.log('🔄 Redirecting to onboarding - not completed in database');
       return Response.redirect(new URL('/onboarding', request.url));
     }
   }

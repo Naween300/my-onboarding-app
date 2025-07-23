@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from 'react';
 import { smeApi } from '@/lib/sme-api';
 import { Card } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
 
 // ✅ Proper TypeScript interfaces
 interface AnalyticsOverview {
@@ -54,11 +53,6 @@ export const AnalyticsWidget: React.FC = () => {
     }
   };
 
-  const refreshAnalytics = () => {
-    setIsLoading(true);
-    loadAnalytics();
-  };
-
   // ✅ Loading state
   if (isLoading && !analytics) {
     return (
@@ -80,7 +74,6 @@ export const AnalyticsWidget: React.FC = () => {
         <div className="text-center py-8">
           <div className="text-gray-400 text-4xl mb-4">📊</div>
           <p className="text-gray-600">No analytics data available</p>
-          <Button className="mt-4" onClick={refreshAnalytics}>Load Analytics Data</Button>
         </div>
       </Card>
     );
@@ -91,10 +84,6 @@ export const AnalyticsWidget: React.FC = () => {
       {/* Header with refresh button */}
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-xl font-semibold text-foreground mb-4">Analytics Overview</h3>
-        <Button variant="outline" size="sm" onClick={refreshAnalytics} disabled={isLoading} className="flex items-center gap-1">
-          <span className={isLoading ? 'animate-spin' : ''}>{isLoading ? '↻' : '🔄'}</span>
-          Refresh
-        </Button>
       </div>
       {/* Enhanced error handling */}
       {error && (
@@ -104,9 +93,6 @@ export const AnalyticsWidget: React.FC = () => {
               <p className="text-destructive text-sm font-medium">Failed to load analytics</p>
               <p className="text-destructive text-xs mt-1">{error}</p>
             </div>
-            <Button variant="destructive" size="sm" onClick={refreshAnalytics} disabled={isLoading}>
-              Retry
-            </Button>
           </div>
         </div>
       )}

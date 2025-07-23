@@ -78,7 +78,6 @@ export const RSSFeedWidget = ({ userBusinessType, hideIndustrySelector = false }
     'business': [
       'https://feeds.feedburner.com/entrepreneur/latest',
       'https://www.inc.com/rss/homepage.xml',
-      'https://feeds.harvard.edu/news/rss/business.xml',
       'https://feeds.feedburner.com/fastcompany/headlines'
     ],
     'finance': [
